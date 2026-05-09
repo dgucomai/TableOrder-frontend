@@ -13,6 +13,7 @@ export default function AdminHomePage() {
   const containerRef = useRef<HTMLDivElement>(null);
   const lastMousePos = useRef({ x: 0, y: 0 });
   const startMousePos = useRef({ x: 0, y: 0 });
+  const easteregg = 1;
 
   const statusConfig = {
     empty: { 
