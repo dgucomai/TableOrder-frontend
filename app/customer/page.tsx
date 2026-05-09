@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState } from 'react';
-import { ShoppingCart, Plus, Minus, X, ChevronRight } from 'lucide-react';
+import { ShoppingCart, Plus, Minus, X, ChevronRight, ReceiptText } from 'lucide-react';
+import Link from 'next/link'; // Next.js 이동을 위한 링크
 
 // --- Types ---
 interface MenuItem {
@@ -72,21 +73,34 @@ export default function OrderPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 pb-28">
-      {/* Header */}
-      <header className="sticky top-0 z-10 bg-white px-4 py-3 flex justify-between items-center shadow-sm">
-        <h1 className="text-lg font-extrabold text-orange-600 tracking-tight">DELICIOUS BUGER</h1>
-        <button 
-          onClick={() => cart.length > 0 && setIsCartOpen(true)}
-          className="relative p-2"
-        >
-          <ShoppingCart className="w-6 h-6 text-gray-800" />
-          {totalQuantity > 0 && (
-            <span className="absolute top-1 right-0 bg-orange-500 text-white text-[10px] font-bold w-4 h-4 flex items-center justify-center rounded-full">
-              {totalQuantity}
-            </span>
-          )}
-        </button>
-      </header>
+        {/* Header */}
+        <header className="sticky top-0 z-10 bg-white px-4 py-3 flex justify-between items-center shadow-sm">
+        <h1 className="text-lg font-extrabold text-orange-600 tracking-tight">CAISINO ORDER</h1>
+        
+        <div className="flex items-center gap-1">
+            {/* 주문 내역 확인 버튼 추가 */}
+            <Link 
+            href="customer/orders" 
+            className="p-2 text-gray-700 hover:bg-gray-100 rounded-full transition-colors"
+            title="주문 내역"
+            >
+            <ReceiptText className="w-6 h-6" />
+            </Link>
+
+            {/* 장바구니 버튼 */}
+            <button 
+            onClick={() => cart.length > 0 && setIsCartOpen(true)}
+            className="relative p-2 text-gray-700 hover:bg-gray-100 rounded-full transition-colors"
+            >
+            <ShoppingCart className="w-6 h-6" />
+            {totalQuantity > 0 && (
+                <span className="absolute top-1 right-1 bg-orange-500 text-white text-[10px] font-bold w-4 h-4 flex items-center justify-center rounded-full border-2 border-white">
+                {totalQuantity}
+                </span>
+            )}
+            </button>
+        </div>
+        </header>
 
       {/* Category Tabs */}
       <div className="sticky top-[52px] z-10 flex gap-2 overflow-x-auto px-4 py-3 bg-white border-b scrollbar-hide">
