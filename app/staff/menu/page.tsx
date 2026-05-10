@@ -3,14 +3,12 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
-  CheckCircle2,
   Clock,
   Layers,
   ListOrdered,
   PackageCheck,
   Search,
   ShoppingBag,
-  Timer,
 } from "lucide-react";
 
 interface MenuItem {
@@ -191,16 +189,6 @@ export default function StaffMenuPage() {
     return getPreparingOrders(menu).reduce((sum, order) => sum + order.quantity, 0);
   };
 
-  const totalPreparingQuantity = useMemo(() => {
-    return orders
-      .filter((order) => order.status === "준비 중")
-      .reduce((sum, order) => sum + order.quantity, 0);
-  }, [orders]);
-
-  const totalCompletedCount = useMemo(() => {
-    return orders.filter((order) => order.status === "제공 완료").length;
-  }, [orders]);
-
   const selectedPreparingOrders = selectedMenu ? getPreparingOrders(selectedMenu) : [];
   const selectedCompletedOrders = selectedMenu ? getCompletedOrders(selectedMenu) : [];
   const selectedPreparingQuantity = selectedPreparingOrders.reduce((sum, order) => sum + order.quantity, 0);
@@ -375,33 +363,7 @@ export default function StaffMenuPage() {
   return (
     <div className="h-full min-h-[calc(100vh-4rem)] bg-[#020617] text-white overflow-y-auto">
       <div className="sticky top-0 z-40 border-b border-slate-800 bg-[#020617]/95 backdrop-blur">
-        <div className="mx-auto max-w-7xl px-4 md:px-6 py-4 space-y-4">
-          <section className="rounded-[1.5rem] border border-slate-800 bg-[#1e293b] p-4 md:p-5 shadow-2xl">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div>
-                <h1 className="text-2xl md:text-4xl font-black tracking-tighter">메뉴별 주문 현황</h1>
-                <p className="mt-1 text-sm text-slate-400 font-medium">
-                  제공 완료 처리 결과가 메뉴별로 정렬되어 표시됩니다.
-                </p>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2 min-w-[240px]">
-                <div className="rounded-2xl bg-orange-500/10 border border-orange-500/20 p-3 text-center">
-                  <p className="text-[11px] font-black text-orange-500 flex items-center justify-center gap-1">
-                    <Timer size={13} /> 전체 준비중
-                  </p>
-                  <p className="mt-1 text-2xl md:text-3xl font-black">{totalPreparingQuantity}개</p>
-                </div>
-                <div className="rounded-2xl bg-slate-900/70 border border-slate-700 p-3 text-center">
-                  <p className="text-[11px] font-black text-slate-500 flex items-center justify-center gap-1">
-                    <CheckCircle2 size={13} /> 완료 건수
-                  </p>
-                  <p className="mt-1 text-2xl md:text-3xl font-black text-slate-300">{totalCompletedCount}건</p>
-                </div>
-              </div>
-            </div>
-          </section>
-
+        <div className="mx-auto max-w-7xl px-4 md:px-6 py-4">
           <section className="rounded-3xl border border-slate-800 bg-[#1e293b]/95 backdrop-blur p-3 shadow-xl">
             <div className="flex flex-col md:flex-row gap-3 md:items-center justify-between">
               <div className="flex gap-2 overflow-x-auto scrollbar-hide">
