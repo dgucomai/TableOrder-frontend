@@ -55,51 +55,53 @@ export default function StaffLoginPage() {
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-[#0f172a] text-white p-4">
-      <div className="w-full max-w-md bg-[#1e293b] rounded-3xl p-8 shadow-2xl border border-slate-700">
+    <div className="flex items-center justify-center min-h-screen bg-[#0f172a] text-white p-4 sm:p-6 md:p-8">
+      <div className="w-full max-w-[320px] sm:max-w-sm md:max-w-md bg-[#1e293b] rounded-2xl sm:rounded-3xl p-6 sm:p-8 md:p-10 shadow-2xl border border-slate-700">
         
-        <div className="text-center mb-10">
-          <div className="inline-block p-4 bg-orange-500/10 rounded-2xl mb-4">
-            <span className="text-4xl">👨‍🍳</span>
+        <div className="text-center mb-8 sm:mb-10">
+          <div className="inline-block p-3 sm:p-4 bg-orange-500/10 rounded-xl sm:rounded-2xl mb-3 sm:mb-4">
+            <span className="text-3xl sm:text-4xl">👨‍🍳</span>
           </div>
-          <h2 className="text-sm font-semibold text-orange-500 tracking-widest uppercase mb-1">Staff Access</h2>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-100">DONGGUK COMAI</h1>
+          <h2 className="text-xs sm:text-sm font-semibold text-orange-500 tracking-widest uppercase mb-1">CAISINO</h2>
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-100">STAFF LOGIN</h1>
         </div>
 
-        <form onSubmit={handleLogin} className="space-y-5">
+        <form onSubmit={handleLogin} className="space-y-4 sm:space-y-5">
           {/* 성함 입력 */}
           <div>
-            <label className="block text-sm font-medium text-slate-400 mb-2 ml-1">성함</label>
+            <label className="block text-xs sm:text-sm font-medium text-slate-400 mb-1 sm:mb-2 ml-1">이름</label>
             <input
               type="text"
               placeholder="한글 3자"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className={`w-full bg-[#0f172a] border ${name && !isNameValid ? 'border-red-500/50' : 'border-slate-600'} rounded-xl py-4 px-5 focus:outline-none focus:ring-2 focus:ring-orange-500 transition-all`}
+              className={`w-full bg-[#0f172a] border ${name && !isNameValid ? 'border-red-500/50' : 'border-slate-600'} rounded-lg sm:rounded-xl py-3 px-4 sm:py-4 sm:px-5 text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-orange-500 transition-all`}
             />
           </div>
 
           {/* 비밀번호 입력 (숨기기/보이기 기능 추가) */}
-          <div className="relative">
-            <label className="block text-sm font-medium text-slate-400 mb-2 ml-1">비밀번호 (6자리)</label>
-            <input
-              type={showPassword ? "text" : "password"}
-              inputMode="numeric"
-              pattern="[0-9]*"
-              maxLength={6}
-              placeholder="● ● ● ● ● ●"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className={`w-full bg-[#0f172a] border ${password && !isPwValid ? 'border-red-500/50' : 'border-slate-600'} rounded-xl py-4 px-5 focus:outline-none focus:ring-2 focus:ring-orange-500 transition-all tracking-[0.3em] text-center text-lg`}
-            />
-            {/* 눈 모양 버튼 */}
-            <button
-              type="button"
-              onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-4 top-[46px] text-slate-500 hover:text-slate-300 transition-colors"
-            >
-              {showPassword ? "🙈" : "👁️"}
-            </button>
+          <div>
+            <label className="block text-xs sm:text-sm font-medium text-slate-400 mb-1 sm:mb-2 ml-1">비밀번호 (6자리)</label>
+            <div className="relative">
+              <input
+                type={showPassword ? "text" : "password"}
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={6}
+                placeholder="● ● ● ● ● ●"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className={`w-full bg-[#0f172a] border ${password && !isPwValid ? 'border-red-500/50' : 'border-slate-600'} rounded-lg sm:rounded-xl py-3 px-4 sm:py-4 sm:px-5 focus:outline-none focus:ring-2 focus:ring-orange-500 transition-all tracking-[0.2em] sm:tracking-[0.3em] text-center text-base sm:text-lg`}
+              />
+              {/* 눈 모양 버튼 - 중앙 정렬로 변경 */}
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors text-sm sm:text-base flex items-center justify-center h-full"
+              >
+                {showPassword ? "🙈" : "👁️"}
+              </button>
+            </div>
           </div>
 
           {/* 아이디 기억하기 체크박스 */}
@@ -109,19 +111,19 @@ export default function StaffLoginPage() {
                 type="checkbox"
                 checked={rememberMe}
                 onChange={(e) => setRememberMe(e.target.checked)}
-                className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-orange-500 focus:ring-orange-500 accent-orange-500"
+                className="w-3.5 h-3.5 sm:w-4 sm:h-4 rounded border-slate-600 bg-slate-800 text-orange-500 focus:ring-orange-500 accent-orange-500"
               />
-              <span className="text-sm text-slate-400 group-hover:text-slate-200 transition-colors">이름 기억하기</span>
+              <span className="text-xs sm:text-sm text-slate-400 group-hover:text-slate-200 transition-colors">이름 기억하기</span>
             </label>
           </div>
 
           <button
             type="submit"
             disabled={!isNameValid || !isPwValid}
-            className={`w-full py-4 rounded-xl font-bold text-lg transition-all ${
+            className={`w-full py-3 sm:py-4 rounded-lg sm:rounded-xl font-bold text-base sm:text-lg transition-all mt-2 ${
               isNameValid && isPwValid 
-                ? 'bg-orange-500 hover:bg-orange-600 active:scale-95 shadow-lg shadow-orange-500/20' 
-                : 'bg-slate-700 cursor-not-allowed opacity-50'
+                ? 'bg-orange-500 hover:bg-orange-600 active:scale-95 shadow-lg shadow-orange-500/20 text-white' 
+                : 'bg-slate-700 cursor-not-allowed opacity-50 text-slate-300'
             }`}
           >
             로그인
