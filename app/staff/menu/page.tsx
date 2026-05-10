@@ -208,20 +208,25 @@ export default function StaffMenuPage() {
   if (selectedMenu) {
     return (
       <div className="h-full min-h-[calc(100vh-4rem)] bg-[#020617] text-white overflow-y-auto">
-        <div className="mx-auto max-w-6xl p-6 space-y-6">
-          <button
-            onClick={() => setSelectedMenu(null)}
-            className="flex items-center gap-2 text-sm font-bold text-slate-400 hover:text-orange-500 transition-colors"
-          >
-            <ArrowLeft size={18} /> 메뉴 목록으로 돌아가기
-          </button>
+        <div className="sticky top-0 z-40 border-b border-slate-800 bg-[#020617]/95 backdrop-blur px-4 md:px-6 py-3">
+          <div className="mx-auto max-w-6xl flex items-center justify-between gap-3">
+            <button
+              onClick={() => setSelectedMenu(null)}
+              className="flex items-center gap-2 rounded-2xl bg-slate-900 px-4 py-3 text-sm font-black text-slate-300 hover:bg-orange-500 hover:text-white transition-colors"
+            >
+              <ArrowLeft size={18} /> 메뉴 목록으로 돌아가기
+            </button>
+            <p className="hidden sm:block text-sm font-bold text-slate-500 truncate">{selectedMenu.name}</p>
+          </div>
+        </div>
 
+        <div className="mx-auto max-w-6xl p-4 md:p-6 space-y-6">
           <section className="rounded-[2rem] border border-slate-800 bg-[#1e293b] overflow-hidden shadow-2xl">
-            <div className="flex flex-col md:flex-row gap-6 p-6 md:p-8 border-b border-white/5 bg-slate-800/40">
+            <div className="flex flex-col md:flex-row gap-6 p-5 md:p-8 border-b border-white/5 bg-slate-800/40">
               <img
                 src={selectedMenu.image}
                 alt={selectedMenu.name}
-                className="w-full md:w-44 h-44 rounded-3xl object-cover bg-slate-900"
+                className="w-full md:w-44 h-40 md:h-44 rounded-3xl object-cover bg-slate-900"
               />
 
               <div className="flex-1 flex flex-col justify-between gap-6">
@@ -234,10 +239,10 @@ export default function StaffMenuPage() {
                       {selectedMenu.price.toLocaleString()}원
                     </span>
                   </div>
-                  <h1 className="text-4xl md:text-5xl font-black tracking-tighter text-white">
+                  <h1 className="text-3xl md:text-5xl font-black tracking-tighter text-white">
                     {selectedMenu.name}
                   </h1>
-                  <p className="mt-3 text-slate-400 font-medium">{selectedMenu.description}</p>
+                  <p className="mt-3 text-slate-400 font-medium">메뉴별 주문 상태를 확인합니다.</p>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
@@ -257,13 +262,13 @@ export default function StaffMenuPage() {
               </div>
             </div>
 
-            <div className="p-6 md:p-8 space-y-8">
+            <div className="p-5 md:p-8 space-y-8">
               <section>
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-xl font-black text-white flex items-center gap-2">
                     <Clock size={22} className="text-orange-500" /> 준비중 주문
                   </h2>
-                  <span className="text-xs font-bold text-slate-500">먼저 들어온 주문이 위에 표시됩니다.</span>
+                  <span className="hidden sm:inline text-xs font-bold text-slate-500">먼저 들어온 주문이 위에 표시됩니다.</span>
                 </div>
 
                 {selectedPreparingOrders.length === 0 ? (
@@ -275,31 +280,30 @@ export default function StaffMenuPage() {
                     {selectedPreparingOrders.map((order, index) => (
                       <div
                         key={order.id}
-                        className="flex flex-col md:flex-row md:items-center justify-between gap-4 rounded-2xl border border-orange-500/20 bg-orange-500/10 p-5"
+                        className="flex flex-col gap-3 rounded-2xl border border-orange-500/20 bg-orange-500/10 p-4 md:p-5"
                       >
                         <div className="flex items-center gap-4">
-                          <div className="w-10 h-10 rounded-2xl bg-orange-500 text-white flex items-center justify-center font-black">
+                          <div className="w-10 h-10 rounded-2xl bg-orange-500 text-white flex items-center justify-center font-black shrink-0">
                             {index + 1}
                           </div>
-                          <div>
+                          <div className="min-w-0">
                             <p className="text-2xl font-black text-white">{order.tableId}번 테이블</p>
-                            <p className="text-sm text-orange-200/70 font-bold">주문번호 {order.orderId}</p>
+                            <p className="text-sm text-orange-200/70 font-bold truncate">주문번호 {order.orderId}</p>
                           </div>
                         </div>
 
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm font-bold">
-                          <div className="rounded-xl bg-slate-950/30 px-4 py-3">
-                            <p className="text-slate-500 text-xs mb-1">주문시간</p>
-                            <p className="text-white">{formatClock(order.orderedAt, order.time)}</p>
-                          </div>
-                          <div className="rounded-xl bg-slate-950/30 px-4 py-3">
-                            <p className="text-slate-500 text-xs mb-1">수량</p>
-                            <p className="text-white">{order.quantity}개</p>
-                          </div>
-                          <div className="rounded-xl bg-slate-950/30 px-4 py-3 col-span-2 md:col-span-1">
-                            <p className="text-slate-500 text-xs mb-1">상태</p>
-                            <p className="text-orange-400">준비 중</p>
-                          </div>
+                        <div className="rounded-xl bg-slate-950/30 px-4 py-3 text-sm md:text-base font-black text-white whitespace-nowrap overflow-x-auto">
+                          <span className="text-slate-400">주문시간</span>
+                          <span className="mx-2 text-slate-600">|</span>
+                          <span>{formatClock(order.orderedAt, order.time)}</span>
+                          <span className="mx-3 text-slate-600">|</span>
+                          <span className="text-slate-400">수량</span>
+                          <span className="mx-2 text-slate-600">|</span>
+                          <span>{order.quantity}개</span>
+                          <span className="mx-3 text-slate-600">|</span>
+                          <span className="text-slate-400">상태</span>
+                          <span className="mx-2 text-slate-600">|</span>
+                          <span className="text-orange-400">준비 중</span>
                         </div>
                       </div>
                     ))}
@@ -312,7 +316,7 @@ export default function StaffMenuPage() {
                   <h2 className="text-xl font-black text-slate-300 flex items-center gap-2">
                     <PackageCheck size={22} className="text-slate-500" /> 제공 완료 주문
                   </h2>
-                  <span className="text-xs font-bold text-slate-500">방금 완료된 주문이 위에 표시됩니다.</span>
+                  <span className="hidden sm:inline text-xs font-bold text-slate-500">방금 완료된 주문이 위에 표시됩니다.</span>
                 </div>
 
                 {selectedCompletedOrders.length === 0 ? (
@@ -370,65 +374,68 @@ export default function StaffMenuPage() {
 
   return (
     <div className="h-full min-h-[calc(100vh-4rem)] bg-[#020617] text-white overflow-y-auto">
-      <div className="mx-auto max-w-7xl p-6 space-y-6">
-        <section className="rounded-[2rem] border border-slate-800 bg-[#1e293b] p-6 md:p-8 shadow-2xl">
-          <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-            <div>
-              <p className="text-sm font-black text-orange-500 uppercase tracking-[0.3em]">Staff Menu Board</p>
-              <h1 className="mt-2 text-4xl md:text-5xl font-black tracking-tighter">메뉴별 주문 현황</h1>
-              <p className="mt-3 text-slate-400 font-medium">
-                staff/home에서 제공 완료 처리한 결과가 메뉴별로 정렬되어 표시됩니다.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 min-w-[280px]">
-              <div className="rounded-2xl bg-orange-500/10 border border-orange-500/20 p-4">
-                <p className="text-xs font-black text-orange-500 uppercase tracking-widest flex items-center gap-2">
-                  <Timer size={14} /> 전체 준비중
+      <div className="sticky top-0 z-40 border-b border-slate-800 bg-[#020617]/95 backdrop-blur">
+        <div className="mx-auto max-w-7xl px-4 md:px-6 py-4 space-y-4">
+          <section className="rounded-[1.5rem] border border-slate-800 bg-[#1e293b] p-4 md:p-5 shadow-2xl">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <h1 className="text-2xl md:text-4xl font-black tracking-tighter">메뉴별 주문 현황</h1>
+                <p className="mt-1 text-sm text-slate-400 font-medium">
+                  제공 완료 처리 결과가 메뉴별로 정렬되어 표시됩니다.
                 </p>
-                <p className="mt-2 text-3xl font-black">{totalPreparingQuantity}개</p>
               </div>
-              <div className="rounded-2xl bg-slate-900/70 border border-slate-700 p-4">
-                <p className="text-xs font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
-                  <CheckCircle2 size={14} /> 완료 건수
-                </p>
-                <p className="mt-2 text-3xl font-black text-slate-300">{totalCompletedCount}건</p>
+
+              <div className="grid grid-cols-2 gap-2 min-w-[240px]">
+                <div className="rounded-2xl bg-orange-500/10 border border-orange-500/20 p-3 text-center">
+                  <p className="text-[11px] font-black text-orange-500 flex items-center justify-center gap-1">
+                    <Timer size={13} /> 전체 준비중
+                  </p>
+                  <p className="mt-1 text-2xl md:text-3xl font-black">{totalPreparingQuantity}개</p>
+                </div>
+                <div className="rounded-2xl bg-slate-900/70 border border-slate-700 p-3 text-center">
+                  <p className="text-[11px] font-black text-slate-500 flex items-center justify-center gap-1">
+                    <CheckCircle2 size={13} /> 완료 건수
+                  </p>
+                  <p className="mt-1 text-2xl md:text-3xl font-black text-slate-300">{totalCompletedCount}건</p>
+                </div>
               </div>
             </div>
-          </div>
-        </section>
+          </section>
 
-        <section className="sticky top-20 z-20 rounded-3xl border border-slate-800 bg-[#1e293b]/95 backdrop-blur p-4 shadow-xl">
-          <div className="flex flex-col md:flex-row gap-3 md:items-center justify-between">
-            <div className="flex gap-2 overflow-x-auto scrollbar-hide">
-              {CATEGORIES.map((category) => (
-                <button
-                  key={category}
-                  onClick={() => setActiveCategory(category)}
-                  className={`px-4 py-2 rounded-full text-sm font-black transition-all whitespace-nowrap ${
-                    activeCategory === category
-                      ? "bg-orange-500 text-white shadow-lg shadow-orange-500/20"
-                      : "bg-slate-900 text-slate-400 hover:text-white"
-                  }`}
-                >
-                  {category}
-                </button>
-              ))}
+          <section className="rounded-3xl border border-slate-800 bg-[#1e293b]/95 backdrop-blur p-3 shadow-xl">
+            <div className="flex flex-col md:flex-row gap-3 md:items-center justify-between">
+              <div className="flex gap-2 overflow-x-auto scrollbar-hide">
+                {CATEGORIES.map((category) => (
+                  <button
+                    key={category}
+                    onClick={() => setActiveCategory(category)}
+                    className={`px-4 py-2 rounded-full text-sm font-black transition-all whitespace-nowrap ${
+                      activeCategory === category
+                        ? "bg-orange-500 text-white shadow-lg shadow-orange-500/20"
+                        : "bg-slate-900 text-slate-400 hover:text-white"
+                    }`}
+                  >
+                    {category}
+                  </button>
+                ))}
+              </div>
+
+              <div className="relative w-full md:w-80">
+                <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" />
+                <input
+                  value={searchKeyword}
+                  onChange={(event) => setSearchKeyword(event.target.value)}
+                  placeholder="메뉴 검색"
+                  className="w-full rounded-2xl bg-slate-900 border border-slate-700 py-3 pl-11 pr-4 text-sm font-bold text-white outline-none focus:ring-2 focus:ring-orange-500"
+                />
+              </div>
             </div>
+          </section>
+        </div>
+      </div>
 
-            <div className="relative w-full md:w-80">
-              <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" />
-              <input
-                value={searchKeyword}
-                onChange={(event) => setSearchKeyword(event.target.value)}
-                placeholder="메뉴 검색"
-                className="w-full rounded-2xl bg-slate-900 border border-slate-700 py-3 pl-11 pr-4 text-sm font-bold text-white outline-none focus:ring-2 focus:ring-orange-500"
-              />
-            </div>
-          </div>
-        </section>
-
-        <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+      <div className="mx-auto max-w-7xl p-4 md:p-6 space-y-6">
+        <section className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-5">
           {filteredMenus.map((menu) => {
             const preparingQuantity = getPreparingQuantity(menu);
             const completedCount = getCompletedOrders(menu).length;
@@ -438,55 +445,49 @@ export default function StaffMenuPage() {
               <button
                 key={menu.id}
                 onClick={() => setSelectedMenu(menu)}
-                className="group text-left rounded-[1.75rem] border border-slate-800 bg-[#1e293b] overflow-hidden hover:border-orange-500/60 hover:-translate-y-1 transition-all shadow-xl"
+                className="group text-left rounded-[1.25rem] md:rounded-[1.75rem] border border-slate-800 bg-[#1e293b] overflow-hidden hover:border-orange-500/60 hover:-translate-y-1 transition-all shadow-xl aspect-[1/1.08] min-h-[210px] md:min-h-[260px]"
               >
-                <div className="relative h-44 overflow-hidden bg-slate-900">
+                <div className="relative h-[40%] overflow-hidden bg-slate-900">
                   <img
                     src={menu.image}
                     alt={menu.name}
                     className="h-full w-full object-cover opacity-80 group-hover:scale-105 group-hover:opacity-100 transition-all duration-300"
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-[#1e293b] via-transparent to-transparent" />
-                  <div className="absolute top-4 left-4 px-3 py-1 rounded-full bg-black/50 backdrop-blur text-xs font-black text-white">
+                  <div className="absolute inset-0 bg-gradient-to-t from-[#1e293b]/70 via-transparent to-transparent" />
+                  <div className="absolute top-2 left-2 px-2 py-1 rounded-full bg-black/50 backdrop-blur text-[10px] md:text-xs font-black text-white">
                     {menu.category}
-                  </div>
-                  <div
-                    className={`absolute top-4 right-4 px-3 py-1 rounded-full text-xs font-black ${
-                      preparingQuantity > 0
-                        ? "bg-orange-500 text-white"
-                        : "bg-slate-900/80 text-slate-400"
-                    }`}
-                  >
-                    준비중 {preparingQuantity}개
                   </div>
                 </div>
 
-                <div className="p-5 space-y-5">
-                  <div>
-                    <h2 className="text-2xl font-black tracking-tight text-white">{menu.name}</h2>
-                    <p className="mt-1 text-sm text-slate-500 font-bold line-clamp-1">{menu.description}</p>
+                <div className="h-[60%] p-3 md:p-5 flex flex-col justify-between gap-2">
+                  <div className="min-h-[2.4rem] flex items-center">
+                    <h2 className="text-base md:text-2xl font-black tracking-tight text-white leading-tight line-clamp-2">
+                      {menu.name}
+                    </h2>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-2">
-                    <div className="rounded-2xl bg-slate-900/70 p-3">
-                      <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest">가격</p>
-                      <p className="mt-1 text-sm font-black text-slate-200">{menu.price.toLocaleString()}원</p>
+                  <div className="grid grid-cols-3 gap-1.5 md:gap-2 text-center">
+                    <div className="rounded-xl md:rounded-2xl bg-slate-900/70 p-2 md:p-3 flex flex-col items-center justify-center">
+                      <p className="text-[10px] md:text-xs text-slate-500 font-black">가격</p>
+                      <p className="mt-1 text-[12px] md:text-lg font-black text-slate-200 leading-tight">
+                        {menu.price.toLocaleString()}원
+                      </p>
                     </div>
-                    <div className="rounded-2xl bg-orange-500/10 p-3">
-                      <p className="text-[10px] text-orange-500 font-black uppercase tracking-widest">준비중</p>
-                      <p className="mt-1 text-sm font-black text-white">{preparingQuantity}개</p>
+                    <div className="rounded-xl md:rounded-2xl bg-orange-500/10 p-2 md:p-3 flex flex-col items-center justify-center">
+                      <p className="text-[10px] md:text-xs text-orange-500 font-black">준비중</p>
+                      <p className="mt-1 text-sm md:text-xl font-black text-white leading-tight">{preparingQuantity}개</p>
                     </div>
-                    <div className="rounded-2xl bg-slate-900/70 p-3">
-                      <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest">완료</p>
-                      <p className="mt-1 text-sm font-black text-slate-300">{completedCount}건</p>
+                    <div className="rounded-xl md:rounded-2xl bg-slate-900/70 p-2 md:p-3 flex flex-col items-center justify-center">
+                      <p className="text-[10px] md:text-xs text-slate-500 font-black">완료</p>
+                      <p className="mt-1 text-sm md:text-xl font-black text-slate-300 leading-tight">{completedCount}건</p>
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between text-sm font-black">
-                    <span className="text-slate-500 flex items-center gap-2">
-                      <ShoppingBag size={16} /> 총 주문 {menuOrderCount}건
+                  <div className="flex items-center justify-between text-[11px] md:text-sm font-black">
+                    <span className="text-slate-500 flex items-center gap-1 md:gap-2">
+                      <ShoppingBag size={14} /> 총 {menuOrderCount}건
                     </span>
-                    <span className="text-orange-500 group-hover:translate-x-1 transition-transform">상세 보기 →</span>
+                    <span className="text-orange-500 group-hover:translate-x-1 transition-transform">보기 →</span>
                   </div>
                 </div>
               </button>
