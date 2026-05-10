@@ -74,7 +74,7 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
               <Link href="/staff/home" className="hover:text-orange-500 transition-colors">홈 (포스)</Link>
               <Link href="/staff/menu" className="hover:text-orange-500 transition-colors">메뉴</Link>
               <Link href="/staff/calls" className="hover:text-orange-500 transition-colors">호출</Link>
-              <Link href="/staff/history" className="hover:text-orange-500 transition-colors">기록</Link>
+              <Link href="/staff/log" className="hover:text-orange-500 transition-colors">기록</Link>
             </div>
           )}
         </div>
