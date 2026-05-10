@@ -6,7 +6,8 @@ import { useRouter } from "next/navigation";
 export default function StaffLoginPage() {
   const router = useRouter();
   
-  // 상태 관리
+  const [isMounted, setIsMounted] = useState(false);
+  
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
@@ -15,22 +16,25 @@ export default function StaffLoginPage() {
   const [isNameValid, setIsNameValid] = useState(false);
   const [isPwValid, setIsPwValid] = useState(false);
 
-  // 1. 초기 로드 시: 저장된 이름 불러오기 및 자동 로그인 체크
   useEffect(() => {
-    const savedName = localStorage.getItem("rememberedStaffName");
-    if (savedName) {
-      setName(savedName);
-      setRememberMe(true);
-    }
+    setIsMounted(true);
 
-    // 세션 유지 체크 (쿠키나 로컬스토리지에 토큰이 있다면 바로 홈으로)
-    const sessionActive = localStorage.getItem("staffSessionActive");
-    if (sessionActive === "true") {
-      router.replace("/staff/home");
+    try {
+      const savedName = localStorage.getItem("rememberedStaffName");
+      if (savedName) {
+        setName(savedName);
+        setRememberMe(true);
+      }
+
+      const sessionActive = localStorage.getItem("staffSessionActive");
+      if (sessionActive === "true") {
+        router.replace("/staff/home");
+      }
+    } catch (error) {
+      console.warn("로컬 스토리지를 사용할 수 없는 환경입니다.", error);
     }
   }, [router]);
 
-  // 2. 유효성 검사
   useEffect(() => {
     setIsNameValid(/^[가-힣]{3}$/.test(name));
     setIsPwValid(/^\d{6}$/.test(password));
@@ -39,23 +43,28 @@ export default function StaffLoginPage() {
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     if (isNameValid && isPwValid) {
-      // 아이디 기억하기 설정
-      if (rememberMe) {
-        localStorage.setItem("rememberedStaffName", name);
-      } else {
-        localStorage.removeItem("rememberedStaffName");
+      try {
+        if (rememberMe) {
+          localStorage.setItem("rememberedStaffName", name);
+        } else {
+          localStorage.removeItem("rememberedStaffName");
+        }
+        localStorage.setItem("staffSessionActive", "true");
+        localStorage.setItem("currentStaffName", name);
+      } catch (error) {
+        console.warn("로그인 정보 저장 실패", error);
       }
-
-      // 세션 유지 설정 (실제로는 백엔드에서 쿠키를 구워주겠지만, 우선 시뮬레이션)
-      localStorage.setItem("staffSessionActive", "true");
-      localStorage.setItem("currentStaffName", name);
 
       router.push("/staff/home"); 
     }
   };
 
+  if (!isMounted) {
+    return <div className="bg-[#0f172a]..." style={{ minHeight: '100vh' }}></div>;
+  }
+
   return (
-    <div className="flex items-center justify-center min-h-screen bg-[#0f172a] text-white p-4 sm:p-6 md:p-8">
+    <div className="flex items-center justify-center min-h-[100dvh] bg-[#0f172a] text-white p-4 sm:p-6 md:p-8">
       <div className="w-full max-w-[320px] sm:max-w-sm md:max-w-md bg-[#1e293b] rounded-2xl sm:rounded-3xl p-6 sm:p-8 md:p-10 shadow-2xl border border-slate-700">
         
         <div className="text-center mb-8 sm:mb-10">
@@ -74,12 +83,13 @@ export default function StaffLoginPage() {
               type="text"
               placeholder="한글 3자"
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              // 🚨 핵심 수정 1: 모바일 자동 공백 추가 완벽 차단
+              onChange={(e) => setName(e.target.value.replace(/\s+/g, ''))}
               className={`w-full bg-[#0f172a] border ${name && !isNameValid ? 'border-red-500/50' : 'border-slate-600'} rounded-lg sm:rounded-xl py-3 px-4 sm:py-4 sm:px-5 text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-orange-500 transition-all`}
             />
           </div>
 
-          {/* 비밀번호 입력 (숨기기/보이기 기능 추가) */}
+          {/* 비밀번호 입력 */}
           <div>
             <label className="block text-xs sm:text-sm font-medium text-slate-400 mb-1 sm:mb-2 ml-1">비밀번호 (6자리)</label>
             <div className="relative">
@@ -90,14 +100,16 @@ export default function StaffLoginPage() {
                 maxLength={6}
                 placeholder="● ● ● ● ● ●"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className={`w-full bg-[#0f172a] border ${password && !isPwValid ? 'border-red-500/50' : 'border-slate-600'} rounded-lg sm:rounded-xl py-3 px-4 sm:py-4 sm:px-5 focus:outline-none focus:ring-2 focus:ring-orange-500 transition-all tracking-[0.2em] sm:tracking-[0.3em] text-center text-base sm:text-lg`}
+                // 🚨 핵심 수정 2: 숫자 이외의 문자(공백 등) 강제 제거
+                onChange={(e) => setPassword(e.target.value.replace(/\D/g, ''))}
+                // 🚨 핵심 수정 3: 버튼과 겹치지 않도록 pr-12(오른쪽 패딩) 추가
+                className={`w-full bg-[#0f172a] border ${password && !isPwValid ? 'border-red-500/50' : 'border-slate-600'} rounded-lg sm:rounded-xl py-3 pl-4 pr-12 sm:py-4 sm:pl-5 sm:pr-14 focus:outline-none focus:ring-2 focus:ring-orange-500 transition-all tracking-[0.2em] sm:tracking-[0.3em] text-center text-base sm:text-lg`}
               />
-              {/* 눈 모양 버튼 - 중앙 정렬로 변경 */}
+              {/* 🚨 핵심 수정 4: z-10 적용 및 p-2로 모바일 터치 영역 넓힘 */}
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors text-sm sm:text-base flex items-center justify-center h-full"
+                className="absolute right-2 top-1/2 -translate-y-1/2 z-10 p-2 text-slate-500 hover:text-slate-300 transition-colors text-sm sm:text-base flex items-center justify-center cursor-pointer"
               >
                 {showPassword ? "🙈" : "👁️"}
               </button>

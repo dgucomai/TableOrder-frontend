@@ -10,9 +10,13 @@ export default function AdminHomePage() {
   const [hasMoved, setHasMoved] = useState(false);
   const [selectedTable, setSelectedTable] = useState<number | null>(null);
   
-  const containerRef = useRef<HTMLDivElement>(null);
+  // 테이블 범위 필터 상태
+  const [startTable, setStartTable] = useState<number | "">("");
+  const [endTable, setEndTable] = useState<number | "">("");
   
-  // 마우스 및 터치 상태 관리 Ref
+  const desktopContainerRef = useRef<HTMLDivElement>(null);
+  
+  // 마우스 및 터치 상태 관리 Ref (데스크탑 맵 뷰 전용)
   const lastMousePos = useRef({ x: 0, y: 0 });
   const startMousePos = useRef({ x: 0, y: 0 });
   
@@ -23,8 +27,6 @@ export default function AdminHomePage() {
     lastY: 0,
     lastDist: 0,
   });
-
-  const easteregg = 1;
 
   const statusConfig = {
     empty: { 
@@ -61,9 +63,9 @@ export default function AdminHomePage() {
     }))
   );
 
-  // 1. 마우스 휠 및 모바일 터치 이벤트 핸들러 등록
+  // 데스크탑 전용 휠/터치 이벤트 핸들러
   useEffect(() => {
-    const area = containerRef.current;
+    const area = desktopContainerRef.current;
     if (!area) return;
 
     const handleWheel = (e: WheelEvent) => {
@@ -76,52 +78,40 @@ export default function AdminHomePage() {
 
     const handleTouchStart = (e: TouchEvent) => {
       if (e.touches.length === 1) {
-        // 원핑거: 이동(Panning) 시작
         touchState.current.isPanning = true;
         touchState.current.isPinching = false;
         touchState.current.lastX = e.touches[0].clientX;
         touchState.current.lastY = e.touches[0].clientY;
         setHasMoved(false);
       } else if (e.touches.length === 2) {
-        // 투핑거: 줌(Pinching) 시작
         touchState.current.isPanning = false;
         touchState.current.isPinching = true;
         const dx = e.touches[0].clientX - e.touches[1].clientX;
         const dy = e.touches[0].clientY - e.touches[1].clientY;
         touchState.current.lastDist = Math.hypot(dx, dy);
-        setHasMoved(true); // 줌 할 때는 클릭 방지
+        setHasMoved(true);
       }
     };
 
     const handleTouchMove = (e: TouchEvent) => {
-      e.preventDefault(); // 모바일 브라우저의 새로고침/스크롤 차단
-
+      e.preventDefault();
       if (touchState.current.isPinching && e.touches.length === 2) {
-        // 핀치 줌 로직
         const dx = e.touches[0].clientX - e.touches[1].clientX;
         const dy = e.touches[0].clientY - e.touches[1].clientY;
         const dist = Math.hypot(dx, dy);
-        
-        // 이전 거리와의 차이를 이용해 줌 비율 계산
         const zoomDelta = (dist - touchState.current.lastDist) * 0.005;
         setZoom(prev => Math.min(Math.max(0.3, prev + zoomDelta), 2.5));
-        
         touchState.current.lastDist = dist;
       } else if (touchState.current.isPanning && e.touches.length === 1) {
-        // 터치 드래그 로직
         const dx = e.touches[0].clientX - touchState.current.lastX;
         const dy = e.touches[0].clientY - touchState.current.lastY;
-
         if (Math.abs(dx) > 5 || Math.abs(dy) > 5) setHasMoved(true);
-
         const LIMIT_X = 1000; 
         const LIMIT_Y = 800;
-
         setPosition((prev) => ({
           x: Math.max(-LIMIT_X, Math.min(LIMIT_X, prev.x + dx)),
           y: Math.max(-LIMIT_Y, Math.min(LIMIT_Y, prev.y + dy))
         }));
-
         touchState.current.lastX = e.touches[0].clientX;
         touchState.current.lastY = e.touches[0].clientY;
       }
@@ -132,7 +122,6 @@ export default function AdminHomePage() {
       touchState.current.isPinching = false;
     };
 
-    // passive: false 옵션을 주어야 e.preventDefault()가 작동함
     area.addEventListener("wheel", handleWheel, { passive: false });
     area.addEventListener("touchstart", handleTouchStart, { passive: false });
     area.addEventListener("touchmove", handleTouchMove, { passive: false });
@@ -148,7 +137,6 @@ export default function AdminHomePage() {
     };
   }, []);
 
-  // 2. 데스크탑 마우스 이벤트 (기존 유지)
   const onMouseDown = (e: React.MouseEvent) => {
     setIsDragging(true);
     setHasMoved(false);
@@ -158,25 +146,17 @@ export default function AdminHomePage() {
 
   const onMouseMove = (e: React.MouseEvent) => {
     if (!isDragging) return;
-
     const totalDistanceX = Math.abs(e.clientX - startMousePos.current.x);
     const totalDistanceY = Math.abs(e.clientY - startMousePos.current.y);
-
-    if (totalDistanceX > 5 || totalDistanceY > 5) {
-      setHasMoved(true);
-    }
-
+    if (totalDistanceX > 5 || totalDistanceY > 5) setHasMoved(true);
     const deltaX = e.clientX - lastMousePos.current.x;
     const deltaY = e.clientY - lastMousePos.current.y;
-
     const LIMIT_X = 1000; 
     const LIMIT_Y = 800;
-
     setPosition((prev) => ({
       x: Math.max(-LIMIT_X, Math.min(LIMIT_X, prev.x + deltaX)),
       y: Math.max(-LIMIT_Y, Math.min(LIMIT_Y, prev.y + deltaY))
     }));
-    
     lastMousePos.current = { x: e.clientX, y: e.clientY };
   };
 
@@ -184,63 +164,81 @@ export default function AdminHomePage() {
     setTimeout(() => setIsDragging(false), 0);
   };
 
-  return (
-    <div className="h-full min-h-screen w-full flex flex-col bg-[#020617] overflow-hidden select-none relative">      
-      {/* 헬퍼 안내창 (반응형 텍스트) */}
-      <div className="absolute bottom-4 left-4 sm:bottom-6 sm:left-6 z-30 bg-slate-900/80 backdrop-blur px-3 py-2 sm:px-4 sm:py-2 rounded-full border border-slate-700 text-[9px] sm:text-[10px] text-slate-400">
-        <span className="hidden sm:inline">
-          <span className="text-orange-500 font-bold">Ctrl + 휠</span> 줌 | <span className="text-orange-500 font-bold">드래그</span> 이동
-        </span>
-        <span className="sm:hidden">
-          <span className="text-orange-500 font-bold">두 손가락</span> 줌 | <span className="text-orange-500 font-bold">드래그</span> 이동
-        </span>
-      </div>
+  // 공통 필터링 판별 로직
+  const checkIsFilteredOut = (id: number) => {
+    if (startTable === "" && endTable === "") return false;
+    if (startTable !== "" && id < startTable) return true;
+    if (endTable !== "" && id > endTable) return true;
+    return false;
+  };
 
-      <div 
-        ref={containerRef}
-        onMouseDown={onMouseDown}
-        onMouseMove={onMouseMove}
-        onMouseUp={onMouseUp}
-        onMouseLeave={onMouseUp}
-        className={`relative flex-1 flex items-center justify-center overflow-hidden w-full h-full ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
-      >
-        {/* 줌/이동이 적용되는 실제 맵 캔버스 */}
-        <div 
-          className="relative transition-transform duration-75 ease-out"
-          style={{ 
-            transform: `translate(${position.x}px, ${position.y}px) scale(${zoom})`,
-            width: '1200px', // 맵 크기는 고정하고 줌/드래그로 탐색
-            transformOrigin: 'center center'
-          }}
-        >
-          {/* 상태 표시 줄 (모바일에서 줄바꿈 되도록 flex-wrap 적용) */}
-          <div className="absolute -top-16 sm:-top-20 left-0 right-0 flex flex-wrap justify-center gap-2 sm:gap-6 py-2 sm:py-4 px-4 bg-slate-900/60 backdrop-blur-md rounded-2xl sm:rounded-3xl border border-slate-800/50 w-max mx-auto max-w-full">
+  return (
+    <div className="h-[100dvh] w-full flex flex-col bg-[#020617] overflow-hidden select-none relative font-sans">      
+      
+      {/* =========================================
+          모바일 전용 UI (md:hidden)
+          ========================================= */}
+      <div className="flex md:hidden flex-col h-full w-full">
+        {/* 모바일 상단 고정 헤더 (상태 요약 & 필터) */}
+        <div className="sticky top-0 z-40 bg-slate-900/95 backdrop-blur-md border-b border-slate-800 p-4 pb-3 flex flex-col gap-3 shadow-lg">
+          {/* 상태 범례 (가로 스크롤) */}
+          <div className="flex gap-3 overflow-x-auto whitespace-nowrap pb-1 [&::-webkit-scrollbar]:hidden">
             {Object.entries(statusConfig).map(([key, config]) => (
-              <div key={key} className="flex items-center space-x-1 sm:space-x-2">
-                <div className={`w-3 h-3 sm:w-5 sm:h-5 rounded-full border-2 sm:border-4 ${config.color.split(' ')[1]}`} />
-                <span className="text-[11px] sm:text-[16px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">
-                  {config.label}
-                </span>
+              <div key={`mob-legend-${key}`} className="flex items-center gap-1.5 shrink-0">
+                <div className={`w-2.5 h-2.5 rounded-full border-2 ${config.color.split(' ')[1]}`} />
+                <span className="text-[11px] font-bold text-slate-400">{config.label}</span>
               </div>
             ))}
           </div>
 
-          {/* 테이블 그리드 (크기 유지) */}
-          <div className="grid grid-cols-10 gap-3 sm:gap-4 mt-8 sm:mt-0">
+          {/* 모바일 번호 필터 */}
+          <div className="flex items-center gap-2 w-full">
+            <span className="text-slate-300 text-xs font-bold whitespace-nowrap">테이블 검색</span>
+            <div className="flex-1 flex gap-1 items-center bg-slate-800/50 p-1 rounded-lg border border-slate-700/50">
+              <input
+                type="number"
+                value={startTable}
+                onChange={(e) => setStartTable(e.target.value === "" ? "" : Number(e.target.value))}
+                className="w-full bg-transparent text-white px-2 py-1.5 text-sm outline-none text-center"
+                placeholder="시작"
+              />
+              <span className="text-slate-500 text-xs">~</span>
+              <input
+                type="number"
+                value={endTable}
+                onChange={(e) => setEndTable(e.target.value === "" ? "" : Number(e.target.value))}
+                className="w-full bg-transparent text-white px-2 py-1.5 text-sm outline-none text-center"
+                placeholder="끝"
+              />
+            </div>
+            <button
+              onClick={() => { setStartTable(""); setEndTable(""); }}
+              className="px-3 py-2 bg-slate-700 active:bg-slate-600 text-white text-xs font-bold rounded-lg transition-colors whitespace-nowrap"
+            >
+              초기화
+            </button>
+          </div>
+        </div>
+
+        {/* 모바일 네이티브 스크롤 그리드 (4열) */}
+        <div className="flex-1 overflow-y-auto p-4 pb-20">
+          <div className="grid grid-cols-4 sm:grid-cols-5 gap-2.5">
             {tables.map((table) => {
               const config = statusConfig[table.status as keyof typeof statusConfig];
+              const isFilteredOut = checkIsFilteredOut(table.id);
+
               return (
                 <button
-                  key={table.id}
-                  onClick={() => !hasMoved && setSelectedTable(table.id)}
+                  key={`mob-tbl-${table.id}`}
+                  onClick={() => setSelectedTable(table.id)}
                   className={`
-                    relative h-16 sm:h-24 rounded-xl sm:rounded-2xl border-2 flex flex-col items-center justify-center transition-all
-                    ${config.color} text-sm sm:text-2xl
-                    hover:border-white/40 hover:scale-105 active:scale-95
+                    relative aspect-square rounded-xl border-2 flex flex-col items-center justify-center transition-all
+                    ${config.color} 
+                    ${isFilteredOut ? 'opacity-10 pointer-events-none grayscale' : 'active:scale-90 active:border-white/50'}
                   `}
                 >
-                  <span className="font-black text-slate-100">{table.id}</span>
-                  {config.icon && <span className="absolute top-1 sm:top-2 right-1 sm:right-2 text-[10px] sm:text-xs">{config.icon}</span>}
+                  <span className="font-black text-slate-100 text-lg">{table.id}</span>
+                  {config.icon && <span className="absolute top-1 right-1.5 text-[10px]">{config.icon}</span>}
                 </button>
               );
             })}
@@ -248,6 +246,99 @@ export default function AdminHomePage() {
         </div>
       </div>
 
+      {/* =========================================
+          데스크탑 전용 UI (hidden md:flex)
+          기존의 Pan/Zoom 드래그 맵 구조
+          ========================================= */}
+      <div className="hidden md:flex flex-1 relative overflow-hidden w-full h-full">
+        {/* 데스크탑 헬퍼 안내창 */}
+        <div className="absolute bottom-6 left-6 z-30 bg-slate-900/80 backdrop-blur px-4 py-2 rounded-full border border-slate-700 text-[11px] text-slate-400 shadow-lg">
+          <span className="text-orange-500 font-bold">Ctrl + 휠</span> 줌 | <span className="text-orange-500 font-bold">드래그</span> 이동
+        </div>
+
+        {/* 데스크탑 번호 필터 UI */}
+        <div className="absolute top-6 right-6 z-40 bg-slate-900/80 backdrop-blur px-5 py-3 rounded-2xl border border-slate-700 flex items-center gap-3 shadow-xl">
+          <span className="text-slate-300 text-sm font-bold">번호 필터</span>
+          <div className="flex items-center gap-2">
+            <input
+              type="number"
+              value={startTable}
+              onChange={(e) => setStartTable(e.target.value === "" ? "" : Number(e.target.value))}
+              className="w-16 bg-slate-800 text-white px-2 py-1.5 rounded-lg border border-slate-600 text-sm outline-none focus:border-orange-500 text-center"
+              placeholder="시작"
+            />
+            <span className="text-slate-400">~</span>
+            <input
+              type="number"
+              value={endTable}
+              onChange={(e) => setEndTable(e.target.value === "" ? "" : Number(e.target.value))}
+              className="w-16 bg-slate-800 text-white px-2 py-1.5 rounded-lg border border-slate-600 text-sm outline-none focus:border-orange-500 text-center"
+              placeholder="끝"
+            />
+            <button
+              onClick={() => { setStartTable(""); setEndTable(""); }}
+              className="ml-2 px-4 py-1.5 bg-slate-700 hover:bg-slate-600 text-white text-sm font-bold rounded-lg transition-colors"
+            >
+              초기화
+            </button>
+          </div>
+        </div>
+
+        <div 
+          ref={desktopContainerRef}
+          onMouseDown={onMouseDown}
+          onMouseMove={onMouseMove}
+          onMouseUp={onMouseUp}
+          onMouseLeave={onMouseUp}
+          className={`relative flex-1 flex items-center justify-center overflow-hidden w-full h-full ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+        >
+          <div 
+            className="relative transition-transform duration-75 ease-out"
+            style={{ 
+              transform: `translate(${position.x}px, ${position.y}px) scale(${zoom})`,
+              width: '1200px',
+              transformOrigin: 'center center'
+            }}
+          >
+            {/* 상태 표시 줄 */}
+            <div className="absolute -top-20 left-0 right-0 flex justify-center gap-6 py-4 px-6 bg-slate-900/80 backdrop-blur-md rounded-3xl border border-slate-700 shadow-xl w-max mx-auto">
+              {Object.entries(statusConfig).map(([key, config]) => (
+                <div key={`desk-legend-${key}`} className="flex items-center space-x-2">
+                  <div className={`w-4 h-4 rounded-full border-4 ${config.color.split(' ')[1]}`} />
+                  <span className="text-[14px] font-black text-slate-300 uppercase tracking-widest whitespace-nowrap">
+                    {config.label}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            {/* 테이블 맵 (10열) */}
+            <div className="grid grid-cols-10 gap-4 mt-0">
+              {tables.map((table) => {
+                const config = statusConfig[table.status as keyof typeof statusConfig];
+                const isFilteredOut = checkIsFilteredOut(table.id);
+
+                return (
+                  <button
+                    key={`desk-tbl-${table.id}`}
+                    onClick={() => !hasMoved && setSelectedTable(table.id)}
+                    className={`
+                      relative h-24 rounded-2xl border-2 flex flex-col items-center justify-center transition-all duration-200
+                      ${config.color} text-2xl
+                      ${isFilteredOut ? 'opacity-10 pointer-events-none grayscale scale-95' : 'hover:border-white/40 hover:scale-105 hover:shadow-lg active:scale-95'}
+                    `}
+                  >
+                    <span className="font-black text-slate-100">{table.id}</span>
+                    {config.icon && <span className="absolute top-2 right-2 text-sm drop-shadow-md">{config.icon}</span>}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 팝업 모달 (모바일/데스크탑 공통) */}
       {selectedTable && (
         <TableDetailPopup 
           tableId={selectedTable} 
