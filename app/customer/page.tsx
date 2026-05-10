@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ShoppingCart, Plus, Minus, X, ChevronRight, ReceiptText } from 'lucide-react';
 import Link from 'next/link'; // Next.js 이동을 위한 링크
 
@@ -18,6 +18,21 @@ interface CartItem extends MenuItem {
   quantity: number;
 }
 
+interface StaffOrderItem {
+  id: string;
+  orderId: string;
+  tableId: number;
+  menuId: number;
+  menuName: string;
+  quantity: number;
+  price: number;
+  orderedAt: string;
+  time: string;
+  status: "준비 중" | "제공 완료";
+  completedBy?: string;
+  completedAt?: string;
+}
+
 // --- Mock Data ---
 const MENU_DATA: MenuItem[] = [
   { id: 1, name: "시그니처 비프 버거", price: 12000, category: "Main", image: "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=500", description: "육즙 가득한 100% 소고기 패티와 특제 소스" },
@@ -31,9 +46,22 @@ const MENU_DATA: MenuItem[] = [
 const CATEGORIES = ["All", "Main", "Sides", "Drinks"];
 
 export default function OrderPage() {
+  const [tableId, setTableId] = useState<number | null>(null);
   const [activeCategory, setActiveCategory] = useState("All");
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false); // 장바구니 모달 상태
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const tableParam = params.get("table");
+    const parsedTableId = Number(tableParam);
+
+    if (Number.isInteger(parsedTableId) && parsedTableId >= 1 && parsedTableId <= 90) {
+      setTableId(parsedTableId);
+    } else {
+      setTableId(null);
+    }
+  }, []);
 
   // 필터링된 메뉴
   const filteredMenu = activeCategory === "All" 
@@ -71,16 +99,59 @@ export default function OrderPage() {
   const totalQuantity = cart.reduce((sum, item) => sum + item.quantity, 0);
   const totalPrice = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
 
+  const handleCheckout = () => {
+    if (!tableId) {
+      alert("테이블 번호가 없습니다. QR 링크를 /customer?table=테이블번호 형식으로 열어주세요.");
+      return;
+    }
+
+    if (cart.length === 0) return;
+
+    const now = new Date();
+    const orderId = `ORD-${Date.now()}`;
+    const orderedAt = now.toISOString();
+    const time = now.toLocaleTimeString("ko-KR", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    });
+
+    const newOrderItems: StaffOrderItem[] = cart.map((item, index) => ({
+      id: `${orderId}-${index + 1}`,
+      orderId,
+      tableId,
+      menuId: item.id,
+      menuName: item.name,
+      quantity: item.quantity,
+      price: item.price,
+      orderedAt,
+      time,
+      status: "준비 중",
+    }));
+
+    const savedOrders: StaffOrderItem[] = JSON.parse(localStorage.getItem("staffOrders") || "[]");
+    localStorage.setItem("staffOrders", JSON.stringify([...savedOrders, ...newOrderItems]));
+
+    alert(`${tableId}번 테이블 주문이 완료되었습니다!`);
+    setCart([]);
+    setIsCartOpen(false);
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 pb-28">
         {/* Header */}
         <header className="sticky top-0 z-10 bg-white px-4 py-3 flex justify-between items-center shadow-sm">
-        <h1 className="text-lg font-extrabold text-orange-600 tracking-tight">CAISINO ORDER</h1>
+        <div>
+          <h1 className="text-lg font-extrabold text-orange-600 tracking-tight">CAISINO ORDER</h1>
+          <p className={`text-xs font-bold ${tableId ? "text-gray-500" : "text-red-500"}`}>
+            {tableId ? `${tableId}번 테이블` : "테이블 번호 없음"}
+          </p>
+        </div>
         
         <div className="flex items-center gap-1">
             {/* 주문 내역 확인 버튼 추가 */}
             <Link 
-            href="customer/orders" 
+            href="/customer/orders" 
             className="p-2 text-gray-700 hover:bg-gray-100 rounded-full transition-colors"
             title="주문 내역"
             >
@@ -101,6 +172,12 @@ export default function OrderPage() {
             </button>
         </div>
         </header>
+
+      {!tableId && (
+        <div className="mx-4 mt-3 rounded-xl border border-red-200 bg-red-50 p-3 text-sm font-bold text-red-600">
+          QR 링크에 테이블 번호가 없습니다. 예: /customer?table=5
+        </div>
+      )}
 
       {/* Category Tabs */}
       <div className="sticky top-[52px] z-10 flex gap-2 overflow-x-auto px-4 py-3 bg-white border-b scrollbar-hide">
@@ -225,10 +302,15 @@ export default function OrderPage() {
                 <span className="text-2xl font-bold text-gray-900">{totalPrice.toLocaleString()}원</span>
               </div>
               <button 
-                onClick={() => alert('주문이 완료되었습니다!')}
-                className="w-full bg-gray-900 text-white py-4 rounded-xl font-bold text-lg hover:bg-gray-800 active:scale-[0.98] transition-transform"
+                onClick={handleCheckout}
+                disabled={!tableId}
+                className={`w-full py-4 rounded-xl font-bold text-lg transition-transform ${
+                  tableId
+                    ? "bg-gray-900 text-white hover:bg-gray-800 active:scale-[0.98]"
+                    : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                }`}
               >
-                결제하기
+                {tableId ? "결제하기" : "테이블 번호 필요"}
               </button>
             </div>
           </div>

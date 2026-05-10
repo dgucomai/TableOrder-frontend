@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { X, Coins, Bell, RotateCcw, Clock, Check, AlertTriangle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -12,6 +12,11 @@ interface Order {
   time: string;
   status: "준비 중" | "제공 완료";
   isTokenPayment?: boolean;
+  tableId?: number;
+  orderId?: string;
+  menuId?: number;
+  completedBy?: string;
+  completedAt?: string;
 }
 
 interface CallInfo {
@@ -35,23 +40,64 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
     { id: "c3", type: "직원 호출", time: "21:15" },
   ]);
 
-  const [orders, setOrders] = useState<Order[]>([
-    { id: "1", name: "토마토 브뤨레", quantity: 2, price: 16000, time: "20:30", status: "제공 완료", isTokenPayment: false },
-    { id: "2", name: "나초 치즈", quantity: 1, price: 12, time: "21:10", status: "준비 중", isTokenPayment: true },
-    { id: "3", name: "어묵탕", quantity: 1, price: 9000, time: "21:10", status: "준비 중", isTokenPayment: false },
-  ]);
+  const [orders, setOrders] = useState<Order[]>([]);
+
+  useEffect(() => {
+    const savedOrders = JSON.parse(localStorage.getItem("staffOrders") || "[]");
+    const tableOrders: Order[] = savedOrders
+      .filter((order: any) => order.tableId === tableId)
+      .map((order: any) => ({
+        id: order.id,
+        orderId: order.orderId,
+        tableId: order.tableId,
+        menuId: order.menuId,
+        name: order.menuName || order.name,
+        quantity: order.quantity,
+        price: order.price,
+        time: order.time,
+        status: order.status || "준비 중",
+        completedBy: order.completedBy,
+        completedAt: order.completedAt,
+      }));
+
+    setOrders(tableOrders);
+  }, [tableId]);
 
   // --- 핸들러 로직 ---
   const handleAcceptCall = (id: string) => {
     setActiveCalls(prev => prev.filter(call => call.id !== id));
   };
 
-  const toggleOrderStatus = (id: string) => {
-    setOrders(prev => prev.map(order => 
-      order.id === id 
-        ? { ...order, status: order.status === "준비 중" ? "제공 완료" : "준비 중" } 
-        : order
-    ));
+  const completeOrder = (id: string) => {
+    const completedBy = localStorage.getItem("currentStaffName") || "알 수 없음";
+    const completedAt = new Date().toISOString();
+
+    setOrders(prev => {
+      const updatedTableOrders = prev.map(order =>
+        order.id === id && order.status === "준비 중"
+          ? { ...order, status: "제공 완료" as const, completedBy, completedAt }
+          : order
+      );
+
+      const savedOrders = JSON.parse(localStorage.getItem("staffOrders") || "[]");
+      const updatedAllOrders = savedOrders.map((order: any) =>
+        order.id === id && order.status === "준비 중"
+          ? { ...order, status: "제공 완료", completedBy, completedAt }
+          : order
+      );
+
+      localStorage.setItem("staffOrders", JSON.stringify(updatedAllOrders));
+      return updatedTableOrders;
+    });
+  };
+
+  const formatCompletedTime = (iso?: string) => {
+    if (!iso) return "";
+    return new Date(iso).toLocaleTimeString("ko-KR", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    });
   };
 
   const handleResetTable = () => {
@@ -153,7 +199,11 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
               <p className="text-xs font-bold text-slate-500 flex items-center gap-2 uppercase tracking-tighter">
                 <Clock size={14} /> 주문 타임라인
               </p>
-              {Object.keys(groupedOrders).map((time) => (
+              {orders.length === 0 ? (
+                <div className="bg-[#0f172a]/40 rounded-2xl p-8 border border-white/5 text-center text-slate-500 font-bold">
+                  이 테이블의 주문이 없습니다.
+                </div>
+              ) : Object.keys(groupedOrders).map((time) => (
                 <div key={time} className="bg-[#0f172a]/40 rounded-2xl p-4 border border-white/5">
                   <div className="text-[15px] text-slate-600 font-mono mb-2 border-b border-white/5 pb-2">주문시간: {time}</div>
                   <div className="space-y-2">
@@ -165,14 +215,25 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
                             <span className="text-sm text-slate-500">{order.price.toLocaleString()}{order.isTokenPayment ? 'T' : '원'} · {order.quantity}개</span>
                           </div>
                         </div>
-                        <button 
-                          onClick={() => toggleOrderStatus(order.id)}
-                          className={`px-6 py-3 rounded-xl font-black text-sm transition-all ${
-                            order.status === "제공 완료" ? "bg-slate-700 text-slate-500 opacity-60" : "bg-orange-500 text-white"
-                          }`}
-                        >
-                          {order.status}
-                        </button>
+                        <div className="flex items-center gap-3">
+                          {order.status === "제공 완료" && (
+                            <div className="text-right text-xs text-slate-500 font-bold leading-relaxed">
+                              <div>완료자: {order.completedBy || "-"}</div>
+                              <div>완료시간: {formatCompletedTime(order.completedAt)}</div>
+                            </div>
+                          )}
+                          <button
+                            disabled={order.status === "제공 완료"}
+                            onClick={() => completeOrder(order.id)}
+                            className={`px-6 py-3 rounded-xl font-black text-sm transition-all ${
+                              order.status === "제공 완료"
+                                ? "bg-slate-700 text-slate-500 opacity-60 cursor-not-allowed"
+                                : "bg-orange-500 text-white hover:bg-orange-400 active:scale-95"
+                            }`}
+                          >
+                            {order.status}
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
