@@ -223,40 +223,40 @@ export default function StaffLogPage() {
   const getLogIcon = (type: LogType) => {
     switch (type) {
       case "호출":
-        return <User size={20} />;
+        return <User size={18} />;
       case "입금확인":
-        return <CreditCard size={20} />;
+        return <CreditCard size={18} />;
       case "상태변경":
-        return <span className="text-lg">🔄</span>;
+        return <span className="text-base">🔄</span>;
       case "로그인":
-        return <User size={20} />;
+        return <User size={18} />;
       case "로그아웃":
-        return <span className="text-lg">↪</span>;
+        return <span className="text-base">↪</span>;
       case "토큰수정":
-        return <span className="text-lg">🪙</span>;
+        return <span className="text-base">🪙</span>;
       case "테이블초기화":
-        return <span className="text-lg">↻</span>;
+        return <span className="text-base">↻</span>;
       case "품절처리":
-        return <span className="text-lg">⚠</span>;
+        return <span className="text-base">⚠</span>;
       case "주문취소":
-        return <span className="text-lg">✕</span>;
+        return <span className="text-base">✕</span>;
       case "메뉴변경":
-        return <span className="text-lg">☰</span>;
+        return <span className="text-base">☰</span>;
     }
   };
 
   return (
-    <div className="min-h-full bg-[#0f172a] px-4 py-5 sm:px-6 lg:px-10">
+    <div className="min-h-full bg-[#0f172a] px-3 py-4 sm:px-6 lg:px-10">
       <div className="mx-auto max-w-5xl">
-        <section className="mb-4 rounded-2xl border border-slate-800 bg-[#1e293b]/70 p-4">
-          <label className="mb-2 block text-xs font-black uppercase tracking-widest text-slate-500">
+        <section className="mb-3 rounded-2xl border border-slate-800 bg-[#1e293b]/70 p-3">
+          <label className="mb-2 block text-[11px] font-black uppercase tracking-widest text-slate-500">
             기록 유형 선택
           </label>
 
           <select
             value={activeFilter}
             onChange={(e) => setActiveFilter(e.target.value as FilterType)}
-            className="w-full rounded-2xl border border-slate-700 bg-slate-900 px-4 py-3 text-sm font-black text-white outline-none transition focus:border-orange-500"
+            className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2.5 text-sm font-black text-white outline-none transition focus:border-orange-500"
           >
             {filters.map((filter) => (
               <option key={filter} value={filter}>
@@ -266,14 +266,14 @@ export default function StaffLogPage() {
           </select>
         </section>
 
-        <section className="rounded-3xl border border-slate-800 bg-[#1e293b]/70 p-4 sm:p-6">
-          <div className="mb-4 flex items-center justify-between">
+        <section className="rounded-3xl border border-slate-800 bg-[#1e293b]/70 p-3 sm:p-5">
+          <div className="mb-3 flex items-center justify-between">
             <div>
-              <h2 className="text-lg font-black text-white sm:text-xl">
+              <h2 className="text-base font-black text-white sm:text-xl">
                 {activeFilter === "전체" ? "전체 운영 기록" : `${activeFilter} 기록`}
               </h2>
 
-              <p className="mt-1 text-xs font-medium text-slate-500">
+              <p className="mt-1 text-[11px] font-medium text-slate-500 sm:text-xs">
                 최근 발생한 기록이 위에 표시됩니다.
               </p>
             </div>
@@ -284,53 +284,47 @@ export default function StaffLogPage() {
           </div>
 
           {filteredLogs.length === 0 ? (
-            <div className="flex min-h-[260px] flex-col items-center justify-center rounded-3xl border border-dashed border-slate-700 bg-slate-900/50 p-6 text-center">
+            <div className="flex min-h-[200px] flex-col items-center justify-center rounded-2xl border border-dashed border-slate-700 bg-slate-900/50 p-5 text-center">
               <p className="text-sm font-black text-slate-400">
                 표시할 기록이 없습니다.
               </p>
             </div>
           ) : (
-            <div className="space-y-3">
-              {filteredLogs.map((log, index) => {
+            <div className="space-y-2.5">
+              {filteredLogs.map((log) => {
                 const style = getLogStyle(log.type);
 
                 return (
                   <article
                     key={log.id}
-                    className={`rounded-2xl border p-4 transition-all hover:border-white/20 sm:p-5 ${style.card}`}
+                    className={`rounded-2xl border p-3 transition-all hover:border-white/20 sm:p-4 ${style.card}`}
                   >
                     <div className="flex items-start gap-3">
                       <div
-                        className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ${style.iconBox}`}
+                        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${style.iconBox}`}
                       >
                         {getLogIcon(log.type)}
                       </div>
 
                       <div className="min-w-0 flex-1">
-                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <h3 className="text-xl font-black text-white">
-                              {log.title}
-                            </h3>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3 className="text-base font-black leading-tight text-white sm:text-lg">
+                            {log.title}
+                          </h3>
 
-                            <span
-                              className={`rounded-full border px-3 py-1 text-xs font-black ${style.badge}`}
-                            >
-                              {log.type}
-                            </span>
-                          </div>
-
-                          <span className="w-fit rounded-full bg-black/20 px-3 py-1 text-xs font-bold text-slate-300">
-                            기록 {index + 1}
+                          <span
+                            className={`rounded-full border px-2 py-0.5 text-[11px] font-black ${style.badge}`}
+                          >
+                            {log.type}
                           </span>
                         </div>
 
-                        <p className="mt-3 text-sm font-bold text-slate-200">
+                        <p className="mt-2 text-xs font-bold leading-relaxed text-slate-200 sm:text-sm">
                           {log.description}
                         </p>
 
-                        <div className="mt-3 flex flex-wrap items-center gap-2 text-xs font-bold text-slate-400">
-                          <Clock size={14} />
+                        <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] font-bold text-slate-400 sm:text-xs">
+                          <Clock size={13} />
                           <span>{log.time}</span>
                           <span className="text-slate-600">|</span>
                           <span>담당자 {log.staffName}</span>
@@ -344,11 +338,11 @@ export default function StaffLogPage() {
                         </div>
 
                         {log.detail && (
-                          <div className="mt-4 rounded-2xl border border-white/5 bg-black/20 p-3">
-                            <p className="mb-1 text-[11px] font-black uppercase tracking-widest text-slate-500">
+                          <div className="mt-3 rounded-xl border border-white/5 bg-black/20 p-2.5">
+                            <p className="mb-1 text-[10px] font-black uppercase tracking-widest text-slate-500">
                               상세 내용
                             </p>
-                            <p className="text-sm font-bold text-slate-100">
+                            <p className="text-xs font-bold leading-relaxed text-slate-100 sm:text-sm">
                               {log.detail}
                             </p>
                           </div>
@@ -364,4 +358,4 @@ export default function StaffLogPage() {
       </div>
     </div>
   );
-}
+} 
