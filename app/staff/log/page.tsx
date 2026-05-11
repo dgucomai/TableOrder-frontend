@@ -1,17 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import {
-  Clock,
-  Check,
-  CreditCard,
-  User,
-  LogOut,
-  Coins,
-  RotateCcw,
-  Trash2,
-  AlertTriangle,
-} from "lucide-react";
+import { Clock, CreditCard, User } from "lucide-react";
 
 type LogType =
   | "호출"
@@ -237,63 +227,43 @@ export default function StaffLogPage() {
       case "입금확인":
         return <CreditCard size={20} />;
       case "상태변경":
-      case "메뉴변경":
-        return <Check size={20} />;
+        return <span className="text-lg">🔄</span>;
       case "로그인":
         return <User size={20} />;
       case "로그아웃":
-        return <LogOut size={20} />;
+        return <span className="text-lg">↪</span>;
       case "토큰수정":
-        return <Coins size={20} />;
+        return <span className="text-lg">🪙</span>;
       case "테이블초기화":
-        return <RotateCcw size={20} />;
+        return <span className="text-lg">↻</span>;
       case "품절처리":
-        return <AlertTriangle size={20} />;
+        return <span className="text-lg">⚠</span>;
       case "주문취소":
-        return <Trash2 size={20} />;
+        return <span className="text-lg">✕</span>;
+      case "메뉴변경":
+        return <span className="text-lg">☰</span>;
     }
   };
 
   return (
     <div className="min-h-full bg-[#0f172a] px-4 py-5 sm:px-6 lg:px-10">
       <div className="mx-auto max-w-5xl">
-        <section className="mb-5 rounded-3xl border border-slate-800 bg-[#1e293b] p-5 shadow-xl sm:p-7">
-          <div>
-            <p className="mb-2 text-xs font-black uppercase tracking-[0.25em] text-orange-500">
-              Staff Logs
-            </p>
+        <section className="mb-4 rounded-2xl border border-slate-800 bg-[#1e293b]/70 p-4">
+          <label className="mb-2 block text-xs font-black uppercase tracking-widest text-slate-500">
+            기록 유형 선택
+          </label>
 
-            <h1 className="text-2xl font-black text-white sm:text-4xl">
-              운영 기록
-            </h1>
-
-            <p className="mt-2 text-sm font-medium text-slate-400">
-              호출, 상태 변경, 로그인, 입금 확인, 토큰 수정, 테이블 초기화, 품절 처리 등 전체 상호작용 기록을 확인합니다.
-            </p>
-          </div>
-        </section>
-
-        <section className="mb-5 rounded-3xl border border-slate-800 bg-[#1e293b]/70 p-4 sm:p-5">
-          <p className="mb-3 text-xs font-black uppercase tracking-widest text-slate-500">
-            기록 유형
-          </p>
-
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+          <select
+            value={activeFilter}
+            onChange={(e) => setActiveFilter(e.target.value as FilterType)}
+            className="w-full rounded-2xl border border-slate-700 bg-slate-900 px-4 py-3 text-sm font-black text-white outline-none transition focus:border-orange-500"
+          >
             {filters.map((filter) => (
-              <button
-                key={filter}
-                type="button"
-                onClick={() => setActiveFilter(filter)}
-                className={`rounded-2xl border px-3 py-3 text-sm font-black transition-all active:scale-95 ${
-                  activeFilter === filter
-                    ? "border-orange-500 bg-orange-500 text-white"
-                    : "border-slate-700 bg-slate-900 text-slate-500 hover:text-white"
-                }`}
-              >
+              <option key={filter} value={filter}>
                 {filter} {getCountByType(filter)}
-              </button>
+              </option>
             ))}
-          </div>
+          </select>
         </section>
 
         <section className="rounded-3xl border border-slate-800 bg-[#1e293b]/70 p-4 sm:p-6">
