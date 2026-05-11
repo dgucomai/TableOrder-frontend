@@ -79,6 +79,16 @@ export default function StaffCallsPage() {
     return baseCalls.filter((call) => call.type === activeFilter);
   }, [baseCalls, activeFilter]);
 
+  const filters: FilterType[] = ["전체", "입금 확인", "직원 호출", "딜러 호출"];
+
+  const getFilterCount = (filter: FilterType) => {
+    if (filter === "전체") {
+      return baseCalls.length;
+    }
+
+    return baseCalls.filter((call) => call.type === filter).length;
+  };
+
   const handleAcceptCall = (id: string) => {
     const now = new Date().toLocaleTimeString("ko-KR", {
       hour: "2-digit",
@@ -98,14 +108,6 @@ export default function StaffCallsPage() {
           : call
       )
     );
-  };
-
-  const getFilterCount = (filter: FilterType) => {
-    if (filter === "전체") {
-      return baseCalls.length;
-    }
-
-    return baseCalls.filter((call) => call.type === filter).length;
   };
 
   const getCallStyle = (type: CallType) => {
@@ -145,27 +147,9 @@ export default function StaffCallsPage() {
     }
   };
 
-  const filters: FilterType[] = ["전체", "입금 확인", "직원 호출", "딜러 호출"];
-
   return (
     <div className="min-h-full bg-[#0f172a] px-4 py-5 sm:px-6 lg:px-10">
       <div className="mx-auto max-w-5xl">
-        <section className="mb-5 rounded-3xl border border-slate-800 bg-[#1e293b] p-5 shadow-xl sm:p-7">
-          <div>
-            <p className="mb-2 text-xs font-black uppercase tracking-[0.25em] text-orange-500">
-              Staff Calls
-            </p>
-
-            <h1 className="text-2xl font-black text-white sm:text-4xl">
-              호출 관리
-            </h1>
-
-            <p className="mt-2 text-sm font-medium text-slate-400">
-              현재 들어온 호출은 큐 방식으로, 수락 완료 호출은 스택 방식으로 관리합니다.
-            </p>
-          </div>
-        </section>
-
         <div className="sticky top-20 z-20 mb-4 grid grid-cols-2 gap-2 rounded-2xl border border-slate-800 bg-slate-950/90 p-1 backdrop-blur">
           <button
             type="button"
@@ -198,27 +182,22 @@ export default function StaffCallsPage() {
           </button>
         </div>
 
-        <section className="mb-5 rounded-3xl border border-slate-800 bg-[#1e293b]/70 p-4 sm:p-5">
-          <p className="mb-3 text-xs font-black uppercase tracking-widest text-slate-500">
-            호출 유형
-          </p>
+        <section className="mb-4 rounded-2xl border border-slate-800 bg-[#1e293b]/70 p-4">
+          <label className="mb-2 block text-xs font-black uppercase tracking-widest text-slate-500">
+            호출 유형 선택
+          </label>
 
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <select
+            value={activeFilter}
+            onChange={(e) => setActiveFilter(e.target.value as FilterType)}
+            className="w-full rounded-2xl border border-slate-700 bg-slate-900 px-4 py-3 text-sm font-black text-white outline-none transition focus:border-orange-500"
+          >
             {filters.map((filter) => (
-              <button
-                key={filter}
-                type="button"
-                onClick={() => setActiveFilter(filter)}
-                className={`rounded-2xl border px-3 py-3 text-sm font-black transition-all active:scale-95 ${
-                  activeFilter === filter
-                    ? "border-orange-500 bg-orange-500 text-white"
-                    : "border-slate-700 bg-slate-900 text-slate-500 hover:text-white"
-                }`}
-              >
+              <option key={filter} value={filter}>
                 {filter} {getFilterCount(filter)}
-              </button>
+              </option>
             ))}
-          </div>
+          </select>
         </section>
 
         <section className="rounded-3xl border border-slate-800 bg-[#1e293b]/70 p-4 sm:p-6">
