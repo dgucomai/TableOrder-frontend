@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from 'react';
-import { ShoppingCart, Plus, Minus, X, ChevronRight, ReceiptText, Bell } from 'lucide-react';
+import { ShoppingCart, Plus, Minus, X, ChevronRight, ReceiptText, Bell, BellRing } from 'lucide-react';
 import Link from 'next/link';
 
 // --- API 명세에 맞춘 타입 정의 ---
@@ -30,6 +30,15 @@ const MOCK_MENUS: MenuItem[] = [
   { menuId: 6, categoryId: 3, categoryName: "음료", menuName: "코카콜라", price: 2000, description: "얼음컵과 함께 제공됩니다", imageUrl: null, soldOut: false },
 ];
 
+// 📌 직원 호출 추천 문구 리스트
+const CALL_PRESETS = [
+  "문제가 생겼어요",
+  "앞접시 주세요",
+  "젓가락 주세요",
+  "테이블 정리 부탁드려요",
+  "기타(직접 입력)"
+];
+
 export default function OrderPage() {
   const [qrToken, setQrToken] = useState<string | null>(null);
   const [displayTableNum, setDisplayTableNum] = useState<string | null>(null);
@@ -43,6 +52,12 @@ export default function OrderPage() {
   
   const [step, setStep] = useState<'MENU' | 'PAYMENT' | 'CALL_SENT'>('MENU');
   const [isLoading, setIsLoading] = useState(false);
+
+  // 🔔 직원 호출 관련 상태
+  const [isCallModalOpen, setIsCallModalOpen] = useState(false);
+  const [selectedCall, setSelectedCall] = useState<string>(CALL_PRESETS[0]);
+  const [customCallText, setCustomCallText] = useState("");
+  const [isCallLoading, setIsCallLoading] = useState(false);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -59,23 +74,17 @@ export default function OrderPage() {
   // --- 1. [Mock] 메뉴 불러오기 API 흉내 ---
   const fetchMenusMock = async () => {
     try {
-      // 0.5초 동안 로딩 (네트워크 지연 흉내)
       await new Promise(resolve => setTimeout(resolve, 500));
-
-      // PDF 5-2. 성공 응답 예시 포맷 적용 
       const mockResponse = {
         success: true,
         code: "OK",
         message: "메뉴 목록 조회 성공",
-        data: {
-          menus: MOCK_MENUS
-        }
+        data: { menus: MOCK_MENUS }
       };
 
       if (mockResponse.success) {
         const fetchedMenus = mockResponse.data.menus;
         setMenuList(fetchedMenus);
-        
         const uniqueCategories = Array.from(new Set(fetchedMenus.map(m => m.categoryName)));
         setCategories(["All", ...uniqueCategories]);
       }
@@ -118,35 +127,74 @@ export default function OrderPage() {
     setStep('PAYMENT');   
   };
 
+  const [isCopied, setIsCopied] = useState(false);
+
+  const handleCopyAccount = async () => {
+    try {
+      await navigator.clipboard.writeText('98215102201013');
+      setIsCopied(true);
+      // 2초 후 다시 '복사하기'로 변경
+      setTimeout(() => setIsCopied(false), 2000);
+    } catch (err) {
+      console.error('계좌번호 복사 실패:', err);
+      alert('계좌번호 복사에 실패했습니다.');
+    }
+  };
+
   // --- 2. [Mock] 주문 요청 API 흉내 ---
   const submitOrderMock = async () => {
     if (!qrToken || cart.length === 0) return;
     setIsLoading(true);
 
     try {
-      console.log("서버로 전송될 페이로드:", {
+      console.log("서버로 전송될 주문 페이로드:", {
         qrToken: qrToken,
         items: cart.map(item => ({ menuId: item.menuId, quantity: item.quantity }))
       });
-
-      // 1.5초 동안 로딩 (결제/주문 처리 지연 흉내)
       await new Promise(resolve => setTimeout(resolve, 1500));
-
-      // PDF 6-3. 성공 응답 예시 포맷 적용 
-      const mockResponse = {
-        success: true,
-        code: "ORDER_CREATED",
-        message: "주문 대기 등록이 완료되었습니다."
-      };
-      
-      if (mockResponse.success) {
-        setStep('CALL_SENT');
-      }
+      setStep('CALL_SENT');
     } catch (error) {
       console.error(error);
       alert("주문 처리 중 오류가 발생했습니다.");
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // --- 3. [Mock] 직원 호출 API 흉내 ---
+  const submitCallMock = async () => {
+    // 전송할 메시지 결정 (기타를 선택했으면 직접 입력한 텍스트 사용)
+    const messageToSend = selectedCall === "기타 (직접 입력)" ? customCallText : selectedCall;
+    
+    if (selectedCall === "기타 (직접 입력)" && !customCallText.trim()) {
+      alert("호출 내용을 입력해주세요.");
+      return;
+    }
+
+    setIsCallLoading(true);
+
+    try {
+      console.log("서버로 전송될 직원 호출 페이로드:", {
+        qrToken: qrToken,
+        tableNum: displayTableNum,
+        message: messageToSend
+      });
+
+      // 1초 동안 로딩 (서버 통신 지연 흉내)
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      alert("직원 호출이 완료되었습니다. 잠시만 기다려주세요!");
+      
+      // 상태 초기화 및 모달 닫기
+      setIsCallModalOpen(false);
+      setSelectedCall(CALL_PRESETS[0]);
+      setCustomCallText("");
+
+    } catch (error) {
+      console.error(error);
+      alert("호출 중 오류가 발생했습니다.");
+    } finally {
+      setIsCallLoading(false);
     }
   };
 
@@ -158,11 +206,16 @@ export default function OrderPage() {
           <header className="sticky top-0 z-10 bg-white px-4 py-3 flex justify-between items-center shadow-sm">
             <div>
               <h1 className="text-lg font-extrabold text-orange-600 tracking-tight">CAISINO ORDER</h1>
-              <p className={`text-xs font-bold ${qrToken ? "text-gray-500" : "text-red-500"}`}>
+              <p className={`text-xs font-bold ${qrToken ? "text-gray-700" : "text-red-500"}`}>
                 {displayTableNum ? `${displayTableNum}번 테이블` : (qrToken ? "테이블 확인 완료" : "잘못된 접근")}
               </p>
             </div>
             <div className="flex items-center gap-1">
+              {/* 🔔 직원 호출 버튼 추가 */}
+              <button onClick={() => setIsCallModalOpen(true)} className="p-2 text-orange-600 hover:bg-orange-50 rounded-full transition-colors flex flex-col items-center justify-center">
+                <BellRing className="w-6 h-6" />
+                <span className="text-[10px] font-bold mt-0.5">호출</span>
+              </button>
               <Link href="/customer/orders" className="p-2 text-gray-700 hover:bg-gray-100 rounded-full transition-colors">
                 <ReceiptText className="w-6 h-6" />
               </Link>
@@ -173,7 +226,7 @@ export default function OrderPage() {
             </div>
           </header>
 
-          <div className="sticky top-[52px] z-10 flex gap-2 overflow-x-auto px-4 py-3 bg-white border-b scrollbar-hide">
+          <div className="sticky top-[60px] z-10 flex gap-2 overflow-x-auto px-4 py-3 bg-white border-b scrollbar-hide">
             {categories.map(cat => (
               <button key={cat} onClick={() => setActiveCategory(cat)} className={`px-4 py-1.5 rounded-full text-sm font-semibold whitespace-nowrap transition-colors ${activeCategory === cat ? "bg-gray-800 text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}>{cat}</button>
             ))}
@@ -194,7 +247,7 @@ export default function OrderPage() {
                     <div>
                       <div className="flex justify-between items-start">
                         <h3 className="font-bold text-gray-900 leading-tight">{item.menuName}</h3>
-                        {item.soldOut && <span className="text-[10px] bg-red-100 text-red-600 px-2 py-0.5 rounded font-bold">품절</span>}
+                        {item.soldOut && <span className="text-[10px] bg-red-100 text-red-600 px-2 py-1 rounded font-bold">품절</span>}
                       </div>
                       <p className="text-xs text-gray-400 mt-1 line-clamp-2">{item.description}</p>
                     </div>
@@ -209,7 +262,7 @@ export default function OrderPage() {
                             <button onClick={() => addToCart(item)} className="p-1.5 text-gray-500 hover:text-gray-900 transition-colors"><Plus size={16} strokeWidth={3} /></button>
                           </div>
                         ) : (
-                          <button onClick={() => addToCart(item)} className="bg-orange-50 text-orange-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-orange-100">담기</button>
+                          <button onClick={() => addToCart(item)} className="bg-orange-50 text-orange-600 px-4 py-2 rounded-lg text-xs font-bold hover:bg-orange-100">담기</button>
                         )
                       )}
                     </div>
@@ -225,7 +278,7 @@ export default function OrderPage() {
       {step === 'PAYMENT' && (
         <div className="fixed inset-0 z-50 bg-black/60 flex items-end">
           <div className="bg-white w-full rounded-t-[32px] p-8 animate-in slide-in-from-bottom duration-300">
-            <h2 className="text-2xl font-black mb-6">입금 정보를 확인해주세요</h2>
+            <h2 className="text-2xl text-black font-black mb-6">입금 정보를 확인해주세요</h2>
             <div className="space-y-4 mb-8">
               <div className="bg-gray-50 p-5 rounded-2xl border">
                 <p className="text-gray-500 text-sm mb-1">총 입금액</p>
@@ -233,12 +286,22 @@ export default function OrderPage() {
               </div>
               <div className="bg-gray-50 p-5 rounded-2xl border">
                 <p className="text-gray-500 text-sm mb-1">입금 계좌</p>
-                <p className="text-lg font-bold">신한 110-123-456789</p>
-                <p className="text-sm text-gray-400">예금주: 강이안(CAI)</p>
+                {/* 계좌정보와 복사 버튼을 가로로 배치 */}
+                <div className="flex justify-between items-center">
+                  <div>
+                    <p className="text-lg text-gray-800 font-bold">IBK기업은행 98215102201013</p>
+                    <p className="text-sm text-gray-500">예금주: 손승현</p>
+                  </div>
+                  <button
+                    onClick={handleCopyAccount}
+                    className="px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gray-50 active:bg-gray-100 transition-colors shadow-sm"
+                  >
+                    {isCopied ? "복사완료✓" : "복사하기"}
+                  </button>
+                </div>
               </div>
             </div>
-            
-            {/* 💡 서버 통신 흉내내는 함수 연결 */}
+            <div className="flex justify-center items-center font-extrabold text-orange-600 tracking-tight mb-2">입금 완료 후 직원을 호출 해주세요.</div>
             <button 
               onClick={submitOrderMock}
               disabled={isLoading}
@@ -284,21 +347,22 @@ export default function OrderPage() {
         </div>
       )}
 
+      {/* 장바구니 모달 */}
       {isCartOpen && (
         <div className="fixed inset-0 z-50 bg-black/60 flex flex-col justify-end">
           <div className="bg-white w-full rounded-t-3xl max-h-[85vh] flex flex-col p-5">
             <div className="flex justify-between items-center mb-5">
-              <h2 className="text-xl font-bold">장바구니</h2>
-              <button onClick={() => setIsCartOpen(false)} className="p-2 bg-gray-100 rounded-full"><X size={20} /></button>
+              <h2 className="text-xl text-gray-900 font-bold">장바구니</h2>
+              <button onClick={() => setIsCartOpen(false)} className="p-2 bg-orange-500 rounded-full"><X size={20} /></button>
             </div>
             <div className="overflow-y-auto space-y-5 mb-5">
               {cart.map(item => (
                 <div key={item.menuId} className="flex justify-between items-center">
-                  <div className="flex-1"><h4 className="font-bold">{item.menuName}</h4><p className="text-sm text-gray-500">{item.price.toLocaleString()}원</p></div>
+                  <div className="flex-1"><h4 className="text-black font-bold">{item.menuName}</h4><p className="text-sm text-gray-500">{item.price.toLocaleString()}원</p></div>
                   <div className="flex items-center bg-gray-50 rounded-lg border ml-4">
-                    <button onClick={() => removeFromCart(item.menuId)} className="p-2"><Minus size={16} /></button>
-                    <span className="w-8 text-center font-bold">{item.quantity}</span>
-                    <button onClick={() => addToCart(item)} className="p-2"><Plus size={16} /></button>
+                    <button onClick={() => removeFromCart(item.menuId)} className="p-2 text-gray-700"><Minus size={16} /></button>
+                    <span className="w-8 text-center text-gray-900 font-bold">{item.quantity}</span>
+                    <button onClick={() => addToCart(item)} className="p-2 text-gray-700"><Plus size={16} /></button>
                   </div>
                 </div>
               ))}
@@ -306,10 +370,69 @@ export default function OrderPage() {
             <div className="border-t pt-5 pb-8">
               <div className="flex justify-between items-center mb-4">
                 <span className="text-gray-500 font-medium">총 결제금액</span>
-                <span className="text-2xl font-bold">{totalPrice.toLocaleString()}원</span>
+                <span className="text-2xl text-black font-bold">{totalPrice.toLocaleString()}원</span>
               </div>
               <button onClick={handleCheckoutReady} className="w-full py-4 bg-gray-900 text-white rounded-xl font-bold text-lg">결제하기</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* 🔔 직원 호출 모달 */}
+      {isCallModalOpen && (
+        <div className="fixed inset-0 z-[60] bg-black/60 flex flex-col justify-end">
+          <div className="bg-white w-full rounded-t-[32px] p-6 animate-in slide-in-from-bottom duration-300">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-black flex items-center gap-2">
+                <BellRing className="text-orange-600" size={24} />
+                직원 호출
+              </h2>
+              <button onClick={() => setIsCallModalOpen(false)} className="p-2 bg-gray-100 hover:bg-gray-200 rounded-full transition-colors">
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="space-y-3 mb-6">
+              <p className="text-sm font-bold text-gray-600">어떤 도움이 필요하신가요?</p>
+              
+              <div className="flex flex-wrap gap-2">
+                {CALL_PRESETS.map((preset) => (
+                  <button
+                    key={preset}
+                    onClick={() => setSelectedCall(preset)}
+                    className={`px-4 py-2.5 rounded-xl text-sm font-bold transition-colors border ${
+                      selectedCall === preset 
+                        ? "bg-orange-50 border-orange-500 text-orange-600" 
+                        : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
+                    }`}
+                  >
+                    {preset}
+                  </button>
+                ))}
+              </div>
+
+              {/* '기타' 선택 시 나타나는 직접 입력 창 */}
+              {selectedCall === "기타 (직접 입력)" && (
+                <div className="mt-4 animate-in fade-in zoom-in-95 duration-200">
+                  <input
+                    type="text"
+                    value={customCallText}
+                    onChange={(e) => setCustomCallText(e.target.value)}
+                    placeholder="필요한 사항을 적어주세요 (예: 젓가락 떨어뜨렸어요)"
+                    className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 text-sm"
+                    autoFocus
+                  />
+                </div>
+              )}
+            </div>
+
+            <button
+              onClick={submitCallMock}
+              disabled={isCallLoading}
+              className="w-full py-4 bg-gray-900 text-white rounded-2xl font-bold text-lg disabled:bg-gray-400 transition-colors flex justify-center items-center"
+            >
+              {isCallLoading ? "호출 중..." : "직원 부르기"}
+            </button>
           </div>
         </div>
       )}
