@@ -218,11 +218,15 @@ export default function OrderPage() {
               </button>
               <Link href="/customer/orders" className="p-2 text-gray-700 hover:bg-gray-100 rounded-full transition-colors">
                 <ReceiptText className="w-6 h-6" />
+                <span className="text-[10px] font-bold mt-0.5">기록</span>
               </Link>
+              {/*} 
               <button onClick={() => cart.length > 0 && setIsCartOpen(true)} className="relative p-2 text-gray-700 hover:bg-gray-100 rounded-full transition-colors">
                 <ShoppingCart className="w-6 h-6" />
                 {totalQuantity > 0 && <span className="absolute top-1 right-1 bg-orange-500 text-white text-[10px] font-bold w-4 h-4 flex items-center justify-center rounded-full border-2 border-white">{totalQuantity}</span>}
+                <span className="text-[10px] font-bold mt-0.5">장바구니</span>
               </button>
+              */}
             </div>
           </header>
 
@@ -383,11 +387,11 @@ export default function OrderPage() {
         <div className="fixed inset-0 z-[60] bg-black/60 flex flex-col justify-end">
           <div className="bg-white w-full rounded-t-[32px] p-6 animate-in slide-in-from-bottom duration-300">
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-black flex items-center gap-2">
+              <h2 className="text-xl text-black font-bold flex items-center gap-3">
                 <BellRing className="text-orange-600" size={24} />
                 직원 호출
               </h2>
-              <button onClick={() => setIsCallModalOpen(false)} className="p-2 bg-gray-100 hover:bg-gray-200 rounded-full transition-colors">
+              <button onClick={() => setIsCallModalOpen(false)} className="p-2 bg-orange-500 hover:bg-gray-200 rounded-full transition-colors">
                 <X size={20} />
               </button>
             </div>
@@ -412,14 +416,15 @@ export default function OrderPage() {
               </div>
 
               {/* '기타' 선택 시 나타나는 직접 입력 창 */}
-              {selectedCall === "기타 (직접 입력)" && (
+              {selectedCall === "기타(직접 입력)" && (
                 <div className="mt-4 animate-in fade-in zoom-in-95 duration-200">
                   <input
                     type="text"
                     value={customCallText}
                     onChange={(e) => setCustomCallText(e.target.value)}
-                    placeholder="필요한 사항을 적어주세요 (예: 젓가락 떨어뜨렸어요)"
-                    className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 text-sm"
+                    maxLength={20}
+                    placeholder="필요한 사항을 적어주세요. (20자 이내)"
+                    className="text-black w-full px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 text-sm"
                     autoFocus
                   />
                 </div>

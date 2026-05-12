@@ -20,7 +20,17 @@ export default function Home() {
         <button 
           className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-4 sm:py-5 px-6 sm:px-8 rounded-2xl shadow-lg hover:shadow-xl transition-all active:scale-95 text-lg sm:text-xl"
         >
-          주문 시작하기
+          주문 페이지
+        </button>
+      </Link>
+      
+      <div> \n </div>
+
+      <Link href="/staff" className="w-full max-w-[280px] sm:max-w-xs">
+        <button 
+          className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-4 sm:py-5 px-6 sm:px-8 rounded-2xl shadow-lg hover:shadow-xl transition-all active:scale-95 text-lg sm:text-xl"
+        >
+          관리 페이지
         </button>
       </Link>
 
