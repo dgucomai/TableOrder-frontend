@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from 'react';
-import { ShoppingCart, Plus, Minus, X, ChevronRight, ReceiptText, Bell, BellRing } from 'lucide-react';
+import { ShoppingCart, Plus, Minus, X, ChevronRight, ReceiptText, Bell, BellRing, User } from 'lucide-react';
 import Link from 'next/link';
 
 // --- API 명세에 맞춘 타입 정의 ---
@@ -20,16 +20,6 @@ interface CartItem extends MenuItem {
   quantity: number;
 }
 
-// 📌 [Mock Data] 백엔드가 줄 메뉴 데이터 흉내내기
-const MOCK_MENUS: MenuItem[] = [
-  { menuId: 1, categoryId: 1, categoryName: "안주", menuName: "바삭 김치전", price: 8000, description: "오징어가 듬뿍 들어간 바삭한 김치전", imageUrl: null, soldOut: false },
-  { menuId: 2, categoryId: 1, categoryName: "안주", menuName: "얼큰 오뎅탕", price: 12000, description: "소주 안주로 제격인 뜨끈한 국물", imageUrl: null, soldOut: false },
-  { menuId: 3, categoryId: 1, categoryName: "안주", menuName: "모듬 튀김", price: 15000, description: "새우, 고구마, 오징어 튀김 세트", imageUrl: null, soldOut: true }, // 품절 테스트용
-  { menuId: 4, categoryId: 2, categoryName: "주류", menuName: "참이슬 후레쉬", price: 5000, description: "국민 소주", imageUrl: null, soldOut: false },
-  { menuId: 5, categoryId: 2, categoryName: "주류", menuName: "생맥주 500cc", price: 4500, description: "시원한 얼음장 생맥주", imageUrl: null, soldOut: false },
-  { menuId: 6, categoryId: 3, categoryName: "음료", menuName: "코카콜라", price: 2000, description: "얼음컵과 함께 제공됩니다", imageUrl: null, soldOut: false },
-];
-
 // 📌 직원 호출 추천 문구 리스트
 const CALL_PRESETS = [
   "문제가 생겼어요",
@@ -38,6 +28,9 @@ const CALL_PRESETS = [
   "테이블 정리 부탁드려요",
   "기타(직접 입력)"
 ];
+
+// 📌 API Base URL 설정
+const API_BASE_URL = "/api";
 
 export default function OrderPage() {
   const [qrToken, setQrToken] = useState<string | null>(null);
@@ -64,32 +57,39 @@ export default function OrderPage() {
     const token = params.get("qrToken");
     const tableNum = params.get("table");
     
-    // 💡 개발 테스트 편의를 위해 파라미터가 없어도 임시 토큰을 부여합니다.
     setQrToken(token || "test_token_123");
     setDisplayTableNum(tableNum || "3"); 
 
-    fetchMenusMock();
+    // 컴포넌트 마운트 시 전체 메뉴 조회 API 호출
+    fetchMenus();
   }, []);
 
-  // --- 1. [Mock] 메뉴 불러오기 API 흉내 ---
-  const fetchMenusMock = async () => {
+  // --- 1. [GET] 전체 메뉴 조회 API ---
+  const fetchMenus = async () => {
     try {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      const mockResponse = {
-        success: true,
-        code: "OK",
-        message: "메뉴 목록 조회 성공",
-        data: { menus: MOCK_MENUS }
-      };
+      const response = await fetch(`${API_BASE_URL}/menus`);
+      
+      if (!response.ok) {
+        throw new Error('네트워크 응답이 정상이 아닙니다.');
+      }
 
-      if (mockResponse.success) {
-        const fetchedMenus = mockResponse.data.menus;
+      const result = await response.json();
+
+      if (result.success) {
+        const fetchedMenus = result.data.menus;
+        
         setMenuList(fetchedMenus);
-        const uniqueCategories = Array.from(new Set(fetchedMenus.map(m => m.categoryName)));
+        
+        // 동적 카테고리 탭 생성
+        const uniqueCategories = Array.from(new Set(fetchedMenus.map((m: MenuItem) => m.categoryName))) as string[];
         setCategories(["All", ...uniqueCategories]);
+      } else {
+        console.error("메뉴 목록 조회 실패:", result.message);
+        alert(result.message || "메뉴를 불러오지 못했습니다.");
       }
     } catch (error) {
-      console.error("메뉴 조회 에러:", error);
+      console.error("API 연동 에러:", error);
+      alert("서버와 통신하는 중 에러가 발생했습니다.");
     }
   };
 
@@ -97,6 +97,7 @@ export default function OrderPage() {
     ? menuList 
     : menuList.filter(item => item.categoryName === activeCategory);
   
+  // 장바구니 담기 (중복 menuId는 프론트에서 수량만 합산 처리 - 명세서 규칙 준수)
   const addToCart = (item: MenuItem) => {
     if (item.soldOut) return;
     setCart(prev => {
@@ -133,7 +134,6 @@ export default function OrderPage() {
     try {
       await navigator.clipboard.writeText('98215102201013');
       setIsCopied(true);
-      // 2초 후 다시 '복사하기'로 변경
       setTimeout(() => setIsCopied(false), 2000);
     } catch (err) {
       console.error('계좌번호 복사 실패:', err);
@@ -141,32 +141,45 @@ export default function OrderPage() {
     }
   };
 
-  // --- 2. [Mock] 주문 요청 API 흉내 ---
-  const submitOrderMock = async () => {
+  // --- 2. [POST] 장바구니 주문 대기 등록 API (입금 확인 요청 통합) ---
+  const submitOrder = async () => {
     if (!qrToken || cart.length === 0) return;
     setIsLoading(true);
 
     try {
-      console.log("서버로 전송될 주문 페이로드:", {
+      // 명세서에 맞게 qrToken과 items(menuId, quantity)만 전송
+      const payload = {
         qrToken: qrToken,
         items: cart.map(item => ({ menuId: item.menuId, quantity: item.quantity }))
+      };
+
+      const response = await fetch(`${API_BASE_URL}/orders`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
       });
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      setStep('CALL_SENT');
+
+      const result = await response.json();
+
+      if (result.success) {
+        setStep('CALL_SENT');
+        setCart([]); // 주문 완료 후 장바구니 초기화
+      } else {
+        alert(result.message || "주문 처리 중 오류가 발생했습니다.");
+      }
     } catch (error) {
       console.error(error);
-      alert("주문 처리 중 오류가 발생했습니다.");
+      alert("서버와 통신하는 중 에러가 발생했습니다.");
     } finally {
       setIsLoading(false);
     }
   };
 
-  // --- 3. [Mock] 직원 호출 API 흉내 ---
-  const submitCallMock = async () => {
-    // 전송할 메시지 결정 (기타를 선택했으면 직접 입력한 텍스트 사용)
-    const messageToSend = selectedCall === "기타 (직접 입력)" ? customCallText : selectedCall;
+  // --- 3. [POST] 직원 호출 API ---
+  const submitStaffCall = async () => {
+    const messageToSend = selectedCall === "기타(직접 입력)" ? customCallText : selectedCall;
     
-    if (selectedCall === "기타 (직접 입력)" && !customCallText.trim()) {
+    if (selectedCall === "기타(직접 입력)" && !customCallText.trim()) {
       alert("호출 내용을 입력해주세요.");
       return;
     }
@@ -174,25 +187,30 @@ export default function OrderPage() {
     setIsCallLoading(true);
 
     try {
-      console.log("서버로 전송될 직원 호출 페이로드:", {
+      const payload = {
         qrToken: qrToken,
-        tableNum: displayTableNum,
         message: messageToSend
+      };
+
+      const response = await fetch(`${API_BASE_URL}/staff-call`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
       });
 
-      // 1초 동안 로딩 (서버 통신 지연 흉내)
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const result = await response.json();
 
-      alert("직원 호출이 완료되었습니다. 잠시만 기다려주세요!");
-      
-      // 상태 초기화 및 모달 닫기
-      setIsCallModalOpen(false);
-      setSelectedCall(CALL_PRESETS[0]);
-      setCustomCallText("");
-
+      if (result.success) {
+        alert("직원 호출이 완료되었습니다. 잠시만 기다려주세요!");
+        setIsCallModalOpen(false);
+        setSelectedCall(CALL_PRESETS[0]);
+        setCustomCallText("");
+      } else {
+        alert(result.message || "호출 중 오류가 발생했습니다.");
+      }
     } catch (error) {
       console.error(error);
-      alert("호출 중 오류가 발생했습니다.");
+      alert("서버와 통신하는 중 에러가 발생했습니다.");
     } finally {
       setIsCallLoading(false);
     }
@@ -211,22 +229,15 @@ export default function OrderPage() {
               </p>
             </div>
             <div className="flex items-center gap-1">
-              {/* 🔔 직원 호출 버튼 추가 */}
+              {/* 직원 호출 버튼 */}
               <button onClick={() => setIsCallModalOpen(true)} className="p-2 text-orange-600 hover:bg-orange-50 rounded-full transition-colors flex flex-col items-center justify-center">
                 <BellRing className="w-6 h-6" />
-                <span className="text-[10px] font-bold mt-0.5">호출</span>
+                <span className="text-[10px] font-bold mt-0.5">직원</span>
               </button>
               <Link href="/customer/orders" className="p-2 text-gray-700 hover:bg-gray-100 rounded-full transition-colors">
                 <ReceiptText className="w-6 h-6" />
                 <span className="text-[10px] font-bold mt-0.5">기록</span>
               </Link>
-              {/*} 
-              <button onClick={() => cart.length > 0 && setIsCartOpen(true)} className="relative p-2 text-gray-700 hover:bg-gray-100 rounded-full transition-colors">
-                <ShoppingCart className="w-6 h-6" />
-                {totalQuantity > 0 && <span className="absolute top-1 right-1 bg-orange-500 text-white text-[10px] font-bold w-4 h-4 flex items-center justify-center rounded-full border-2 border-white">{totalQuantity}</span>}
-                <span className="text-[10px] font-bold mt-0.5">장바구니</span>
-              </button>
-              */}
             </div>
           </header>
 
@@ -237,43 +248,49 @@ export default function OrderPage() {
           </div>
 
           <main className="bg-white">
-            {filteredMenu.map(item => {
-              const cartItem = cart.find(i => i.menuId === item.menuId);
-              return (
-                <div key={item.menuId} className={`flex gap-4 p-4 border-b border-gray-100 ${item.soldOut ? "opacity-50" : ""}`}>
-                  {item.imageUrl ? (
-                    <img src={item.imageUrl} alt={item.menuName} className="w-24 h-24 rounded-xl object-cover shrink-0 bg-gray-100" />
-                  ) : (
-                    <div className="w-24 h-24 rounded-xl shrink-0 bg-gray-200 flex items-center justify-center text-xs text-gray-400">No Image</div>
-                  )}
-                  
-                  <div className="flex-1 flex flex-col justify-between py-1">
-                    <div>
-                      <div className="flex justify-between items-start">
-                        <h3 className="font-bold text-gray-900 leading-tight">{item.menuName}</h3>
-                        {item.soldOut && <span className="text-[10px] bg-red-100 text-red-600 px-2 py-1 rounded font-bold">품절</span>}
+            {filteredMenu.length === 0 ? (
+              <div className="flex justify-center items-center h-40 text-gray-400">
+                메뉴를 불러오는 중이거나 메뉴가 없습니다.
+              </div>
+            ) : (
+              filteredMenu.map(item => {
+                const cartItem = cart.find(i => i.menuId === item.menuId);
+                return (
+                  <div key={item.menuId} className={`flex gap-4 p-4 border-b border-gray-100 ${item.soldOut ? "opacity-50" : ""}`}>
+                    {item.imageUrl ? (
+                      <img src={item.imageUrl} alt={item.menuName} className="w-24 h-24 rounded-xl object-cover shrink-0 bg-gray-100" />
+                    ) : (
+                      <div className="w-24 h-24 rounded-xl shrink-0 bg-gray-200 flex items-center justify-center text-xs text-gray-400">No Image</div>
+                    )}
+                    
+                    <div className="flex-1 flex flex-col justify-between py-1">
+                      <div>
+                        <div className="flex justify-between items-start">
+                          <h3 className="font-bold text-gray-900 leading-tight">{item.menuName}</h3>
+                          {item.soldOut && <span className="text-[10px] bg-red-100 text-red-600 px-2 py-1 rounded font-bold">품절</span>}
+                        </div>
+                        <p className="text-xs text-gray-400 mt-1 line-clamp-2">{item.description}</p>
                       </div>
-                      <p className="text-xs text-gray-400 mt-1 line-clamp-2">{item.description}</p>
-                    </div>
-                    <div className="flex justify-between items-end mt-2">
-                      <span className="font-bold text-gray-900">{item.price.toLocaleString()}원</span>
-                      
-                      {!item.soldOut && (
-                        cartItem ? (
-                          <div className="flex items-center bg-gray-50 rounded-lg border border-gray-200">
-                            <button onClick={() => removeFromCart(item.menuId)} className="p-1.5 text-gray-500 hover:text-gray-900 transition-colors"><Minus size={16} strokeWidth={3} /></button>
-                            <span className="w-6 text-center text-sm font-bold text-gray-800">{cartItem.quantity}</span>
-                            <button onClick={() => addToCart(item)} className="p-1.5 text-gray-500 hover:text-gray-900 transition-colors"><Plus size={16} strokeWidth={3} /></button>
-                          </div>
-                        ) : (
-                          <button onClick={() => addToCart(item)} className="bg-orange-50 text-orange-600 px-4 py-2 rounded-lg text-xs font-bold hover:bg-orange-100">담기</button>
-                        )
-                      )}
+                      <div className="flex justify-between items-end mt-2">
+                        <span className="font-bold text-gray-900">{item.price.toLocaleString()}원</span>
+                        
+                        {!item.soldOut && (
+                          cartItem ? (
+                            <div className="flex items-center bg-gray-50 rounded-lg border border-gray-200">
+                              <button onClick={() => removeFromCart(item.menuId)} className="p-1.5 text-gray-500 hover:text-gray-900 transition-colors"><Minus size={16} strokeWidth={3} /></button>
+                              <span className="w-6 text-center text-sm font-bold text-gray-800">{cartItem.quantity}</span>
+                              <button onClick={() => addToCart(item)} className="p-1.5 text-gray-500 hover:text-gray-900 transition-colors"><Plus size={16} strokeWidth={3} /></button>
+                            </div>
+                          ) : (
+                            <button onClick={() => addToCart(item)} className="bg-orange-50 text-orange-600 px-4 py-2 rounded-lg text-xs font-bold hover:bg-orange-100">담기</button>
+                          )
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })
+            )}
           </main>
         </>
       )}
@@ -290,7 +307,6 @@ export default function OrderPage() {
               </div>
               <div className="bg-gray-50 p-5 rounded-2xl border">
                 <p className="text-gray-500 text-sm mb-1">입금 계좌</p>
-                {/* 계좌정보와 복사 버튼을 가로로 배치 */}
                 <div className="flex justify-between items-center">
                   <div>
                     <p className="text-lg text-gray-800 font-bold">IBK기업은행 98215102201013</p>
@@ -307,11 +323,11 @@ export default function OrderPage() {
             </div>
             <div className="flex justify-center items-center font-extrabold text-orange-600 tracking-tight mb-2">입금 완료 후 직원을 호출 해주세요.</div>
             <button 
-              onClick={submitOrderMock}
+              onClick={submitOrder}
               disabled={isLoading}
               className="w-full bg-gray-900 text-white py-5 rounded-2xl font-bold text-xl active:scale-[0.98] transition-transform shadow-lg disabled:bg-gray-400 flex justify-center items-center"
             >
-              {isLoading ? "요청 중..." : "입금 완료 (직원 호출)"}
+              {isLoading ? "요청 중..." : "입금 완료 (주문 등록)"}
             </button>
             <button disabled={isLoading} onClick={() => setStep('MENU')} className="w-full mt-4 text-gray-400 font-medium py-2">취소하고 돌아가기</button>
           </div>
@@ -330,7 +346,7 @@ export default function OrderPage() {
             자동으로 주문 접수가 완료됩니다.
           </p>
           <button 
-            onClick={() => { setCart([]); setStep('MENU'); }}
+            onClick={() => setStep('MENU')}
             className="w-full max-w-[240px] bg-gray-100 text-gray-600 py-4 rounded-2xl font-bold"
           >
             메뉴판으로 돌아가기
@@ -415,7 +431,7 @@ export default function OrderPage() {
                 ))}
               </div>
 
-              {/* '기타' 선택 시 나타나는 직접 입력 창 */}
+               {/* 공백 없는 "기타(직접 입력)" 으로 정확히 조건 매칭 */}
               {selectedCall === "기타(직접 입력)" && (
                 <div className="mt-4 animate-in fade-in zoom-in-95 duration-200">
                   <input
@@ -432,7 +448,7 @@ export default function OrderPage() {
             </div>
 
             <button
-              onClick={submitCallMock}
+              onClick={submitStaffCall}
               disabled={isCallLoading}
               className="w-full py-4 bg-gray-900 text-white rounded-2xl font-bold text-lg disabled:bg-gray-400 transition-colors flex justify-center items-center"
             >
