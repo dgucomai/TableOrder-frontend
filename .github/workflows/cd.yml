@@ -13,11 +13,6 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v3
 
-    - name: Set up SSH agent
-      uses: webfactory/ssh-agent@v0.8.0
-      with:
-        ssh-private-key: ${{ secrets.SSH_KEY }}
-
     - name: Deploy to Server and Build
       uses: appleboy/ssh-action@master
       with:
@@ -29,7 +24,7 @@ jobs:
           cd /DGUComAI_TableOrder/TableOrder-frontend
           
           git fetch origin
-          git reset --hard origin/main
+          git reset --hard origin/Server
           
           npm install
           npm run build
