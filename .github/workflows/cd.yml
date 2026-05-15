@@ -22,9 +22,10 @@ jobs:
         port: ${{ secrets.SSH_PORT }}
         script: |
           cd /DGUComAI_TableOrder/TableOrder-frontend
+
+          git config --global --add safe.directory /DGUComAI_TableOrder/TableOrder-frontend
           
-          git fetch origin/Server
-          git reset --hard origin Server
+          git pull origin Server
           
           npm install
           npm run build
