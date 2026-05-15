@@ -29,5 +29,7 @@ jobs:
           
           npm install
           npm run build
+
+          chown -R www-data:www-data /DGUComAI_TableOrder/TableOrder-frontend
           
           service nginx restart
