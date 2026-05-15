@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "CAISINO",
-  description: "동국대학교 대동제 컴퓨터AI학부 주점",
+  title: "CAISINO 테이블오더 서비스",
+  description: "동국대학교 대동제 컴퓨터AI학부 주점 CAISINO",
 };
 
 export default function RootLayout({
