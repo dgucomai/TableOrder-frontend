@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { Menu, X, LogOut, User } from "lucide-react";
@@ -12,8 +12,6 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
   const router = useRouter();
   const pathname = usePathname();
 
-  const isLoginPage = pathname === "/staff";
-
   const navLinks = [
     { href: "/staff/home", label: "홈 (포스)" },
     { href: "/staff/menu", label: "메뉴" },
@@ -22,27 +20,26 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
   ];
 
   useEffect(() => {
-    setIsMounted(true); // 마운트 상태 업데이트
+    setIsMounted(true);
 
     try {
       const sessionActive = localStorage.getItem("staffSessionActive");
       const savedName = localStorage.getItem("currentStaffName");
       
-      if (sessionActive !== "true" && !isLoginPage) {
+      // 관리자 그룹 내부이므로 세션이 없으면 즉시 로그인 페이지로 튕겨냅니다.
+      if (sessionActive !== "true") {
         alert("로그인이 필요한 서비스입니다.");
         router.replace("/staff");
         return;
       }
       
-      if (sessionActive === "true" && savedName) {
+      if (savedName) {
         setAdminName(savedName);
-      } else {
-        setAdminName("");
       }
     } catch (error) {
       console.warn("로컬 스토리지에 접근할 수 없습니다.", error);
     }
-  }, [pathname, isLoginPage, router]);
+  }, [pathname, router]);
 
   useEffect(() => {
     setIsMenuOpen(false);
@@ -57,73 +54,65 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
     }
   };
 
-  // 🚨 가장 큰 원인이었던 전체 렌더링 블로킹 코드를 삭제했습니다!
-  // if (!isMounted) return <div className="min-h-screen bg-[#0f172a]" />;
+  // 마운트 전 서버-클라이언트 불일치(Hydration) 방지 구조 유지
+  if (!isMounted) return <div className="min-h-screen bg-[#0f172a]" />;
 
   return (
-    // 모바일 브라우저 뷰포트 고려를 위해 100dvh로 변경
     <div className="min-h-[100dvh] bg-[#0f172a] text-white flex flex-col">
       {/* 네비게이션 바 */}
       <nav className="h-16 border-b border-slate-800 bg-[#1e293b] flex items-center justify-between px-4 md:px-6 sticky top-0 z-[100]">
         <div className="flex items-center space-x-4 md:space-x-8">
-          {!isLoginPage && (
-            <button 
-              onClick={() => setIsMenuOpen(!isMenuOpen)}
-              className="md:hidden p-2 hover:bg-slate-700 rounded-lg transition-colors"
-            >
-              {isMenuOpen ? <X size={24} /> : <Menu size={24} />}
-            </button>
-          )}
+          {/* 모바일 햄버거 버튼 (언제나 노출) */}
+          <button 
+            onClick={() => setIsMenuOpen(!isMenuOpen)}
+            className="md:hidden p-2 hover:bg-slate-700 rounded-lg transition-colors"
+            type="button"
+          >
+            {isMenuOpen ? <X size={24} /> : <Menu size={24} />}
+          </button>
 
-          {isLoginPage ? (
-            <span className="text-xl font-black text-orange-500 tracking-tighter cursor-default">
-              CAISINO
-            </span>
-          ) : (
-            <Link href="/staff/home" className="text-xl font-black text-orange-500 tracking-tighter hover:opacity-80 transition-opacity">
-              CAISINO
-            </Link>
-          )}
+          {/* 로고 링크 */}
+          <Link href="/staff/home" className="text-xl font-black text-orange-500 tracking-tighter hover:opacity-80 transition-opacity">
+            CAISINO
+          </Link>
           
-          {!isLoginPage && (
-            <div className="hidden md:flex space-x-6 text-sm font-medium">
-              {navLinks.map((link) => (
-                <Link 
-                  key={link.href} 
-                  href={link.href} 
-                  className={`transition-colors ${pathname === link.href ? 'text-orange-500' : 'hover:text-orange-500'}`}
-                >
-                  {link.label}
-                </Link>
-              ))}
-            </div>
-          )}
+          {/* 데스크탑 네비게이션 메뉴 */}
+          <div className="hidden md:flex space-x-6 text-sm font-medium">
+            {navLinks.map((link) => (
+              <Link 
+                key={link.href} 
+                href={link.href} 
+                className={`transition-colors ${pathname === link.href ? 'text-orange-500' : 'hover:text-orange-500'}`}
+              >
+                {link.label}
+              </Link>
+            ))}
+          </div>
         </div>
         
-        {!isLoginPage && (
-          <div className="flex items-center gap-3">
-            <div className="hidden sm:flex flex-col items-end text-[12px] md:text-sm text-slate-400">
-              <div>
-                {/* 텍스트 단위에서만 안전하게 Hydration 처리 */}
-                관리자 <span className="text-white font-bold">{isMounted ? (adminName || "확인 중...") : "..."}</span> 님
-              </div>
+        {/* 우측 관리자 정보 및 로그아웃 */}
+        <div className="flex items-center gap-3">
+          <div className="hidden sm:flex flex-col items-end text-[12px] md:text-sm text-slate-400">
+            <div>
+              관리자 <span className="text-white font-bold">{adminName || "확인 중..."}</span> 님
             </div>
-            {isMounted && adminName && (
-              <button 
-                onClick={handleLogout} 
-                className="p-2 md:p-0 md:text-xs text-slate-500 hover:text-red-400 transition-colors"
-                title="로그아웃"
-              >
-                <LogOut size={18} className="md:hidden" />
-                <span className="hidden md:inline">로그아웃</span>
-              </button>
-            )}
           </div>
-        )}
+          {adminName && (
+            <button 
+              onClick={handleLogout} 
+              className="p-2 md:p-0 md:text-xs text-slate-500 hover:text-red-400 transition-colors"
+              title="로그아웃"
+              type="button"
+            >
+              <LogOut size={18} className="md:hidden" />
+              <span className="hidden md:inline">로그아웃</span>
+            </button>
+          )}
+        </div>
       </nav>
 
       {/* 모바일 사이드 메뉴 */}
-      {!isLoginPage && isMenuOpen && (
+      {isMenuOpen && (
         <>
           <div className="fixed inset-0 bg-black/60 z-[80] md:hidden" onClick={() => setIsMenuOpen(false)} />
           <aside className="fixed left-0 top-16 bottom-0 w-64 bg-[#1e293b] border-r border-slate-800 z-[90] md:hidden p-6 flex flex-col">
@@ -132,7 +121,7 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
                 <User size={16} />
                 <span className="text-sm font-medium">현재 접속자</span>
               </div>
-              <div className="text-lg font-bold text-white">{isMounted ? adminName : "..."} 관리자님</div>
+              <div className="text-lg font-bold text-white">{adminName} 관리자님</div>
             </div>
             <nav className="flex flex-col gap-4">
               {navLinks.map((link) => (
@@ -148,6 +137,7 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
             <button 
               onClick={handleLogout}
               className="mt-auto flex items-center justify-center gap-2 bg-red-500/10 text-red-500 py-4 rounded-xl font-bold"
+              type="button"
             >
               <LogOut size={18} /> 로그아웃
             </button>
@@ -155,7 +145,7 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
         </>
       )}
 
-      {/* 본문 콘텐츠 (여기서 로그인 폼이 정상적으로 그려질 것입니다) */}
+      {/* 본문 콘텐츠 */}
       <main className="flex-1 overflow-x-hidden overflow-y-auto">
         {children}
       </main>
