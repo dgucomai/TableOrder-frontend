@@ -1,7 +1,17 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
+// TableDetailPopup 내부에서 상세 조회(GET /api/staff/tables/{tableId}) API를 호출하도록 구현되어야 합니다.
 import TableDetailPopup from "@/components/TableDetailPopup";
+
+// 백엔드 API에서 내려주는 상태 타입 정의
+type BackendTableStatus = "EMPTY" | "IN_USE" | "PAYMENT_PENDING" | "STAFF_CALL" | "DEALER_CALL";
+
+// 프론트엔드 테이블 데이터 구조
+interface TableData {
+  id: number;
+  status: string; // 매핑된 프론트엔드용 상태값 (empty, active, deposit, staff, dealer)
+}
 
 export default function AdminHomePage() {
   const [zoom, setZoom] = useState(1);
@@ -15,55 +25,116 @@ export default function AdminHomePage() {
   const [endTable, setEndTable] = useState<number | "">("");
   
   const desktopContainerRef = useRef<HTMLDivElement>(null);
-  
-  // 마우스 및 터치 상태 관리 Ref (데스크탑 맵 뷰 전용)
   const lastMousePos = useRef({ x: 0, y: 0 });
   const startMousePos = useRef({ x: 0, y: 0 });
-  
-  const touchState = useRef({
-    isPanning: false,
-    isPinching: false,
-    lastX: 0,
-    lastY: 0,
-    lastDist: 0,
-  });
+  const touchState = useRef({ isPanning: false, isPinching: false, lastX: 0, lastY: 0, lastDist: 0 });
 
+  // [API 연동 1] 상태 환경 설정 유지 (디자인)
   const statusConfig = {
-    empty: { 
-      color: "bg-slate-800/40 border-slate-700 text-slate-600", 
-      label: "빈 테이블", 
-      icon: "" 
-    },
-    active: { 
-      color: "bg-orange-500/20 border-orange-500 text-white", 
-      label: "이용 중", 
-      icon: "" 
-    },
-    deposit: { 
-      color: "bg-yellow-500/30 border-yellow-500 text-white animate-pulse shadow-[0_0_20px_rgba(234,179,8,0.5)]", 
-      label: "입금 확인", 
-      icon: "💰" 
-    },
-    staff: { 
-      color: "bg-cyan-500/30 border-cyan-500 text-white animate-pulse shadow-[0_0_20px_rgba(34,211,238,0.5)]", 
-      label: "직원 호출", 
-      icon: "🙋" 
-    },
-    dealer: { 
-      color: "bg-purple-500/30 border-purple-500 text-white animate-pulse shadow-[0_0_20px_rgba(168,85,247,0.5)]", 
-      label: "딜러 호출", 
-      icon: "🃏" 
-    },
+    empty: { color: "bg-slate-800/40 border-slate-700 text-slate-600", label: "빈 테이블", icon: "" },
+    active: { color: "bg-orange-500/20 border-orange-500 text-white", label: "이용 중", icon: "" },
+    deposit: { color: "bg-yellow-500/30 border-yellow-500 text-white animate-pulse shadow-[0_0_20px_rgba(234,179,8,0.5)]", label: "입금 확인", icon: "💰" },
+    staff: { color: "bg-cyan-500/30 border-cyan-500 text-white animate-pulse shadow-[0_0_20px_rgba(34,211,238,0.5)]", label: "직원 호출", icon: "🙋" },
+    dealer: { color: "bg-purple-500/30 border-purple-500 text-white animate-pulse shadow-[0_0_20px_rgba(168,85,247,0.5)]", label: "딜러 호출", icon: "🃏" },
   };
 
-  const [tables] = useState(
-    Array.from({ length: 90 }, (_, i) => ({
-      id: i + 1,
-      status: i === 4 ? "deposit" : i === 11 ? "staff" : i === 13 ? "dealer" : i % 8 === 0 ? "active" : "empty",
-    }))
-  );
+  // 백엔드 상태(tableStatus)를 프론트 UI(statusConfig 키)로 변환해주는 헬퍼 함수
+  const mapBackendStatusToFrontend = (backendStatus: BackendTableStatus): string => {
+    switch (backendStatus) {
+      case "EMPTY": return "empty";
+      case "IN_USE": return "active";
+      case "PAYMENT_PENDING": return "deposit";
+      case "STAFF_CALL": return "staff";
+      case "DEALER_CALL": return "dealer";
+      default: return "empty";
+    }
+  };
 
-  // 데스크탑 전용 휠/터치 이벤트 핸들러
+  // [API 연동 2] 초기 상태는 빈 배열로 시작 (로딩 중 표시를 추가해도 좋습니다)
+  const [tables, setTables] = useState<TableData[]>([]);
+
+  // [API 연동 3] 초기 데이터 Fetch 및 SSE 연결 (컴포넌트 마운트 시 1회 실행)
+  useEffect(() => {
+    // 임시: 로컬 스토리지 등에서 JWT 토큰을 가져온다고 가정
+    const token = localStorage.getItem("staffAccessToken") || "";
+
+    const fetchInitialTables = async () => {
+      try {
+        const response = await fetch("/api/staff/tables", {
+          method: "GET",
+          headers: {
+            "Authorization": `Bearer ${token}`,
+            "Content-Type": "application/json"
+          }
+        });
+
+        // 명세서 기반 인증 예외 처리 (401, 403)
+        if (response.status === 401 || response.status === 403) {
+          alert(response.status === 401 ? "로그인이 필요합니다." : "직원 권한이 필요합니다.");
+          window.location.href = "/staff";
+          return;
+        }
+
+        const result = await response.json();
+        if (result.success && result.data?.tables) {
+          // 백엔드 데이터를 프론트 데이터 형식으로 변환하여 저장
+          const formattedTables = result.data.tables.map((t: any) => ({
+            id: t.tableId,
+            status: mapBackendStatusToFrontend(t.tableStatus)
+          }));
+          setTables(formattedTables);
+        }
+      } catch (error) {
+        console.error("초기 테이블 현황 조회 실패:", error);
+      }
+    };
+
+    fetchInitialTables();
+
+    // ==========================================
+    // [API 연동 4] SSE (Server-Sent Events) 연결
+    // ==========================================
+    // 주의: EventSource는 기본적으로 Header를 지원하지 않으므로, 
+    // 백엔드 설계에 따라 query 파라미터(?token=)로 토큰을 보내거나
+    // fetch-event-source 라이브러리를 사용해 Header에 Bearer를 넣어야 합니다.
+    const eventSource = new EventSource(`/api/staff/sse?token=${token}`);
+
+    // 범용 메시지 수신 (혹은 eventSource.addEventListener('TABLE_STATUS_CHANGED', ...) 방식 사용 가능)
+    eventSource.onmessage = (event) => {
+      try {
+        const parsedData = JSON.parse(event.data);
+        
+        // SSE 이벤트에 table 정보가 변경된 단일 데이터로 넘어온다고 명세에 정의됨
+        if (parsedData && parsedData.table) {
+          const { tableId, tableStatus } = parsedData.table;
+          
+          // 해당 tableId를 가진 테이블의 상태만 업데이트하여 리렌더링 유발
+          setTables((prevTables) =>
+            prevTables.map((t) =>
+              t.id === tableId
+                ? { ...t, status: mapBackendStatusToFrontend(tableStatus) }
+                : t
+            )
+          );
+        }
+      } catch (error) {
+        console.error("SSE 데이터 파싱 에러:", error);
+      }
+    };
+
+    // 에러 발생 시 재동기화를 위해 다시 fetch 하도록 처리할 수 있습니다.
+    eventSource.onerror = () => {
+      console.warn("SSE 연결이 끊어졌거나 에러가 발생했습니다. 재동기화 시도 중...");
+      // 연결이 닫혔다면 다시 fetchInitialTables()를 호출하는 로직 추가 가능
+    };
+
+    // 컴포넌트 언마운트 시 SSE 연결 종료 (단일 연결 유지 정책 준수)
+    return () => {
+      eventSource.close();
+    };
+  }, []);
+
+  // --- 기존의 데스크탑 전용 휠/터치 마우스 이벤트 핸들러 (유지) ---
   useEffect(() => {
     const area = desktopContainerRef.current;
     if (!area) return;
@@ -164,7 +235,6 @@ export default function AdminHomePage() {
     setTimeout(() => setIsDragging(false), 0);
   };
 
-  // 공통 필터링 판별 로직
   const checkIsFilteredOut = (id: number) => {
     if (startTable === "" && endTable === "") return false;
     if (startTable !== "" && id < startTable) return true;
@@ -175,13 +245,10 @@ export default function AdminHomePage() {
   return (
     <div className="h-[100dvh] w-full flex flex-col bg-[#020617] overflow-hidden select-none relative font-sans">      
       
-      {/* =========================================
-          모바일 전용 UI (md:hidden)
-          ========================================= */}
+      {/* 모바일 뷰 유지 */}
       <div className="flex md:hidden flex-col h-full w-full">
-        {/* 모바일 상단 고정 헤더 (상태 요약 & 필터) */}
+        {/* 모바일 헤더 로직 생략 (기존과 완벽히 동일) */}
         <div className="sticky top-0 z-40 bg-slate-900/95 backdrop-blur-md border-b border-slate-800 p-4 pb-3 flex flex-col gap-3 shadow-lg">
-          {/* 상태 범례 (가로 스크롤) */}
           <div className="flex gap-3 overflow-x-auto whitespace-nowrap pb-1 [&::-webkit-scrollbar]:hidden">
             {Object.entries(statusConfig).map(([key, config]) => (
               <div key={`mob-legend-${key}`} className="flex items-center gap-1.5 shrink-0">
@@ -191,7 +258,6 @@ export default function AdminHomePage() {
             ))}
           </div>
 
-          {/* 모바일 번호 필터 */}
           <div className="flex items-center gap-2 w-full">
             <span className="text-slate-300 text-xs font-bold whitespace-nowrap">테이블 검색</span>
             <div className="flex-1 flex gap-1 items-center bg-slate-800/50 p-1 rounded-lg border border-slate-700/50">
@@ -220,11 +286,11 @@ export default function AdminHomePage() {
           </div>
         </div>
 
-        {/* 모바일 네이티브 스크롤 그리드 (4열) */}
         <div className="flex-1 overflow-y-auto p-4 pb-20">
           <div className="grid grid-cols-4 sm:grid-cols-5 gap-2.5">
             {tables.map((table) => {
-              const config = statusConfig[table.status as keyof typeof statusConfig];
+              // 초기 로딩 시 status가 없을 수도 있으므로 fallback 방어 로직 추가
+              const config = statusConfig[table.status as keyof typeof statusConfig] || statusConfig.empty;
               const isFilteredOut = checkIsFilteredOut(table.id);
 
               return (
@@ -246,17 +312,12 @@ export default function AdminHomePage() {
         </div>
       </div>
 
-      {/* =========================================
-          데스크탑 전용 UI (hidden md:flex)
-          기존의 Pan/Zoom 드래그 맵 구조
-          ========================================= */}
+      {/* 데스크탑 뷰 유지 */}
       <div className="hidden md:flex flex-1 relative overflow-hidden w-full h-full">
-        {/* 데스크탑 헬퍼 안내창 */}
         <div className="absolute bottom-6 left-6 z-30 bg-slate-900/80 backdrop-blur px-4 py-2 rounded-full border border-slate-700 text-[11px] text-slate-400 shadow-lg">
           <span className="text-orange-500 font-bold">Ctrl + 휠</span> 줌 | <span className="text-orange-500 font-bold">드래그</span> 이동
         </div>
 
-        {/* 데스크탑 번호 필터 UI */}
         <div className="absolute top-6 right-6 z-40 bg-slate-900/80 backdrop-blur px-5 py-3 rounded-2xl border border-slate-700 flex items-center gap-3 shadow-xl">
           <span className="text-slate-300 text-sm font-bold">번호 필터</span>
           <div className="flex items-center gap-2">
@@ -300,7 +361,6 @@ export default function AdminHomePage() {
               transformOrigin: 'center center'
             }}
           >
-            {/* 상태 표시 줄 */}
             <div className="absolute -top-20 left-0 right-0 flex justify-center gap-6 py-4 px-6 bg-slate-900/80 backdrop-blur-md rounded-3xl border border-slate-700 shadow-xl w-max mx-auto">
               {Object.entries(statusConfig).map(([key, config]) => (
                 <div key={`desk-legend-${key}`} className="flex items-center space-x-2">
@@ -312,10 +372,9 @@ export default function AdminHomePage() {
               ))}
             </div>
 
-            {/* 테이블 맵 (10열) */}
             <div className="grid grid-cols-10 gap-4 mt-0">
               {tables.map((table) => {
-                const config = statusConfig[table.status as keyof typeof statusConfig];
+                const config = statusConfig[table.status as keyof typeof statusConfig] || statusConfig.empty;
                 const isFilteredOut = checkIsFilteredOut(table.id);
 
                 return (
@@ -338,7 +397,10 @@ export default function AdminHomePage() {
         </div>
       </div>
 
-      {/* 팝업 모달 (모바일/데스크탑 공통) */}
+      {/* [API 연동 5] 액션 처리 (주문 승인, 호출 해결, 테이블 정리) 
+        이 부분은 테이블 클릭 시 열리는 TableDetailPopup 컴포넌트 내부에서 
+        명세서의 PATCH, DELETE API들을 호출하도록 구현되어야 합니다.
+      */}
       {selectedTable && (
         <TableDetailPopup 
           tableId={selectedTable} 
