@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import { Check, Clock, CreditCard, User } from "lucide-react";
 
 type CallType = "입금 확인" | "직원 호출" | "딜러 호출";

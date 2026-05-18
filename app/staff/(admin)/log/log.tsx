@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import { Clock, CreditCard, User } from "lucide-react";
 
 type LogType =

@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
-import TableDetailPopup from "../../../components/TableDetailPopup";
+import React, { useState, useRef, useEffect } from "react";
+import TableDetailPopup from "@/components/TableDetailPopup";
 
 export default function AdminHomePage() {
   const [zoom, setZoom] = useState(1);
