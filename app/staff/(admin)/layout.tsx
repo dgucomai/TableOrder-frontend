@@ -50,7 +50,7 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
       localStorage.removeItem("staffSessionActive");
       localStorage.removeItem("currentStaffName");
       setAdminName("");
-      router.push("/staff");
+      router.replace("/staff");
     }
   };
 
