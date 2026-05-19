@@ -76,11 +76,11 @@ export default function AdminHomePage() {
         }
 
         const result = await response.json();
-        if (result.success && result.data?.tables) {
-          // 백엔드 데이터를 프론트 데이터 형식으로 변환하여 저장
-          const formattedTables = result.data.tables.map((t: any) => ({
-            id: t.tableId,
-            status: mapBackendStatusToFrontend(t.tableStatus)
+        if (Array.isArray(result)) {
+          const formattedTables = result.map((t: any) => ({
+            id: t.tableId, // (참고) 화면에 100, 101 등 tableNumber를 띄우려면 여기를 수정해야 할 수도 있습니다.
+            // 2. t.tableStatus 가 아닌 t.status 로 받아옵니다.
+            status: mapBackendStatusToFrontend(t.status) 
           }));
           setTables(formattedTables);
         }

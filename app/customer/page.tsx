@@ -221,32 +221,40 @@ export default function OrderPage() {
       {/* 1. MENU 단계 */}
       {step === 'MENU' && (
         <>
-          <header className="sticky top-0 z-10 bg-white px-4 py-3 flex justify-between items-center shadow-sm">
-            <div>
-              <h1 className="text-lg font-extrabold text-orange-600 tracking-tight">CAISINO ORDER</h1>
-              <p className={`text-xs font-bold ${qrToken ? "text-gray-700" : "text-red-500"}`}>
-                {displayTableNum ? `${displayTableNum}번 테이블` : (qrToken ? "테이블 확인 완료" : "잘못된 접근")}
-              </p>
-            </div>
-            <div className="flex items-center gap-1">
-              {/* 직원 호출 버튼 */}
-              <button onClick={() => setIsCallModalOpen(true)} className="p-2 text-orange-600 hover:bg-orange-50 rounded-full transition-colors flex flex-col items-center justify-center">
-                <BellRing className="w-6 h-6" />
-                <span className="text-[10px] font-bold mt-0.5">직원</span>
-              </button>
-              <Link href="/customer/orders" className="p-2 text-gray-700 hover:bg-gray-100 rounded-full transition-colors">
-                <ReceiptText className="w-6 h-6" />
-                <span className="text-[10px] font-bold mt-0.5">기록</span>
-              </Link>
-            </div>
-          </header>
+          <div className="sticky top-0 z-20 bg-white flex flex-col">
+            {/* 기존 헤더에서 sticky 관련 클래스 제거 */}
+            <header className="px-4 py-3 flex justify-between items-center shadow-sm">
+              <div>
+                <h1 className="text-lg font-extrabold text-orange-600 tracking-tight">CAISINO ORDER</h1>
+                <p className={`text-xs font-bold ${qrToken ? "text-gray-700" : "text-red-500"}`}>
+                  {displayTableNum ? `${displayTableNum}번 테이블` : (qrToken ? "테이블 확인 완료" : "잘못된 접근")}
+                </p>
+              </div>
+              <div className="flex items-center gap-1">
+                <button onClick={() => setIsCallModalOpen(true)} className="p-2 text-orange-600 hover:bg-orange-50 rounded-full transition-colors flex flex-col items-center justify-center">
+                  <BellRing className="w-6 h-6" />
+                  <span className="text-[10px] font-bold mt-0.5">직원</span>
+                </button>
+                <Link href="/customer/orders" className="p-2 text-gray-700 hover:bg-gray-100 rounded-full transition-colors">
+                  <ReceiptText className="w-6 h-6" />
+                  <span className="text-[10px] font-bold mt-0.5">기록</span>
+                </Link>
+              </div>
+            </header>
 
-          <div className="sticky top-[60px] z-10 flex gap-2 overflow-x-auto px-4 py-3 bg-white border-b scrollbar-hide">
-            {categories.map(cat => (
-              <button key={cat} onClick={() => setActiveCategory(cat)} className={`px-4 py-1.5 rounded-full text-sm font-semibold whitespace-nowrap transition-colors ${activeCategory === cat ? "bg-gray-800 text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}>{cat}</button>
-            ))}
+            {/* 기존 카테고리 탭에서 sticky, top-[60px] 제거 */}
+            <div className="flex gap-2 overflow-x-auto px-4 py-3 border-b scrollbar-hide">
+              {categories.map(cat => (
+                <button 
+                  key={cat} 
+                  onClick={() => setActiveCategory(cat)} 
+                  className={`px-4 py-1.5 rounded-full text-sm font-semibold whitespace-nowrap transition-colors ${activeCategory === cat ? "bg-gray-800 text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
           </div>
-
           <main className="bg-white">
             {filteredMenu.length === 0 ? (
               <div className="flex justify-center items-center h-40 text-gray-400">
