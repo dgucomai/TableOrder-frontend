@@ -72,7 +72,7 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
           </button>
 
           {/* 로고 링크 */}
-          <Link href="/staff/home" className="text-xl font-black text-orange-500 tracking-tighter hover:opacity-80 transition-opacity">
+          <Link href="/staff/home" replace={pathname !== '/staff/home'} className="text-xl font-black text-orange-500 tracking-tighter hover:opacity-80 transition-opacity">
             CAISINO
           </Link>
           
@@ -82,6 +82,7 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
               <Link 
                 key={link.href} 
                 href={link.href} 
+                replace={pathname !== '/staff/home'} // 조건부 replace 적용
                 className={`transition-colors ${pathname === link.href ? 'text-orange-500' : 'hover:text-orange-500'}`}
               >
                 {link.label}
@@ -128,6 +129,7 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
                 <Link 
                   key={link.href} 
                   href={link.href}
+                  replace={pathname !== '/staff/home'} // 조건부 replace 적용
                   className={`text-lg font-semibold py-2 ${pathname === link.href ? 'text-orange-500' : 'text-slate-300'}`}
                 >
                   {link.label}

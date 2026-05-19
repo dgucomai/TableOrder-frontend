@@ -132,7 +132,7 @@ export default function OrderPage() {
 
   const handleCopyAccount = async () => {
     try {
-      await navigator.clipboard.writeText('98215102201013');
+      await navigator.clipboard.writeText('IBK기업은행 98215102201013');
       setIsCopied(true);
       setTimeout(() => setIsCopied(false), 2000);
     } catch (err) {
@@ -303,11 +303,9 @@ export default function OrderPage() {
                     </div>
                   );
                 })}
-                
-                {/* [수정 2] 모든 메뉴가 렌더링된 후 맨 마지막에 항상 표시되는 안내 문구 */}
                 <div className="py-8 pb-12 flex justify-center items-center">
                   <p className="text-xs text-gray-400 font-medium bg-gray-50 px-4 py-2 rounded-lg">
-                    ✨ 메뉴 이미지는 AI로 만든 참고용 사진 입니다.
+                    ✨ 모든 메뉴 이미지는 AI로 만든 참고용 사진 입니다.
                   </p>
                 </div>
               </>
