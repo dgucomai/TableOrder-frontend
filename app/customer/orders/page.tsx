@@ -141,7 +141,7 @@ export default function OrderHistoryPage() {
                     </div>
                     <button 
                       onClick={() => {
-                         navigator.clipboard.writeText("98215102201013");
+                         navigator.clipboard.writeText("IBK기업은행 98215102201013");
                          alert("계좌번호가 복사되었습니다.");
                       }}
                       className="shrink-0 bg-white border border-red-200 text-red-600 text-xs px-3 py-1.5 rounded-lg font-bold hover:bg-red-50 active:bg-red-100 transition-colors"
