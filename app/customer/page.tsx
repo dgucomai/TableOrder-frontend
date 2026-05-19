@@ -221,8 +221,9 @@ export default function OrderPage() {
       {/* 1. MENU 단계 */}
       {step === 'MENU' && (
         <>
-          <div className="sticky top-0 z-20 bg-white flex flex-col">
-            {/* 기존 헤더에서 sticky 관련 클래스 제거 */}
+          {/* [수정 1] 헤더와 카테고리를 감싸는 완벽한 고정(Sticky) 래퍼 */}
+          {/* z-index를 30으로 올리고, 완벽한 불투명 배경(bg-white)을 적용해 하단 요소가 절대 비치지 않게 합니다. */}
+          <div className="sticky top-0 z-30 flex flex-col bg-white">
             <header className="px-4 py-3 flex justify-between items-center shadow-sm">
               <div>
                 <h1 className="text-lg font-extrabold text-orange-600 tracking-tight">CAISINO ORDER</h1>
@@ -231,6 +232,7 @@ export default function OrderPage() {
                 </p>
               </div>
               <div className="flex items-center gap-1">
+                {/* 직원 호출 버튼 */}
                 <button onClick={() => setIsCallModalOpen(true)} className="p-2 text-orange-600 hover:bg-orange-50 rounded-full transition-colors flex flex-col items-center justify-center">
                   <BellRing className="w-6 h-6" />
                   <span className="text-[10px] font-bold mt-0.5">직원</span>
@@ -242,8 +244,8 @@ export default function OrderPage() {
               </div>
             </header>
 
-            {/* 기존 카테고리 탭에서 sticky, top-[60px] 제거 */}
-            <div className="flex gap-2 overflow-x-auto px-4 py-3 border-b scrollbar-hide">
+            {/* 카테고리 탭 (기존 sticky 제거됨) */}
+            <div className="flex gap-2 overflow-x-auto px-4 py-3 border-b border-gray-100 scrollbar-hide">
               {categories.map(cat => (
                 <button 
                   key={cat} 
@@ -255,49 +257,60 @@ export default function OrderPage() {
               ))}
             </div>
           </div>
+
           <main className="bg-white">
             {filteredMenu.length === 0 ? (
               <div className="flex justify-center items-center h-40 text-gray-400">
                 메뉴를 불러오는 중이거나 메뉴가 없습니다.
               </div>
             ) : (
-              filteredMenu.map(item => {
-                const cartItem = cart.find(i => i.menuId === item.menuId);
-                return (
-                  <div key={item.menuId} className={`flex gap-4 p-4 border-b border-gray-100 ${item.soldOut ? "opacity-50" : ""}`}>
-                    {item.imageUrl ? (
-                      <img src={item.imageUrl} alt={item.menuName} className="w-24 h-24 rounded-xl object-cover shrink-0 bg-gray-100" />
-                    ) : (
-                      <div className="w-24 h-24 rounded-xl shrink-0 bg-gray-200 flex items-center justify-center text-xs text-gray-400">No Image</div>
-                    )}
-                    
-                    <div className="flex-1 flex flex-col justify-between py-1">
-                      <div>
-                        <div className="flex justify-between items-start">
-                          <h3 className="font-bold text-gray-900 leading-tight">{item.menuName}</h3>
-                          {item.soldOut && <span className="text-[10px] bg-red-100 text-red-600 px-2 py-1 rounded font-bold">품절</span>}
+              <>
+                {/* 메뉴 리스트 렌더링 */}
+                {filteredMenu.map(item => {
+                  const cartItem = cart.find(i => i.menuId === item.menuId);
+                  return (
+                    <div key={item.menuId} className={`flex gap-4 p-4 border-b border-gray-100 ${item.soldOut ? "opacity-50" : ""}`}>
+                      {item.imageUrl ? (
+                        <img src={item.imageUrl} alt={item.menuName} className="w-24 h-24 rounded-xl object-cover shrink-0 bg-gray-100" />
+                      ) : (
+                        <div className="w-24 h-24 rounded-xl shrink-0 bg-gray-200 flex items-center justify-center text-xs text-gray-400">No Image</div>
+                      )}
+                      
+                      <div className="flex-1 flex flex-col justify-between py-1">
+                        <div>
+                          <div className="flex justify-between items-start">
+                            <h3 className="font-bold text-gray-900 leading-tight">{item.menuName}</h3>
+                            {item.soldOut && <span className="text-[10px] bg-red-100 text-red-600 px-2 py-1 rounded font-bold">품절</span>}
+                          </div>
+                          <p className="text-xs text-gray-400 mt-1 line-clamp-2">{item.description}</p>
                         </div>
-                        <p className="text-xs text-gray-400 mt-1 line-clamp-2">{item.description}</p>
-                      </div>
-                      <div className="flex justify-between items-end mt-2">
-                        <span className="font-bold text-gray-900">{item.price.toLocaleString()}원</span>
-                        
-                        {!item.soldOut && (
-                          cartItem ? (
-                            <div className="flex items-center bg-gray-50 rounded-lg border border-gray-200">
-                              <button onClick={() => removeFromCart(item.menuId)} className="p-1.5 text-gray-500 hover:text-gray-900 transition-colors"><Minus size={16} strokeWidth={3} /></button>
-                              <span className="w-6 text-center text-sm font-bold text-gray-800">{cartItem.quantity}</span>
-                              <button onClick={() => addToCart(item)} className="p-1.5 text-gray-500 hover:text-gray-900 transition-colors"><Plus size={16} strokeWidth={3} /></button>
-                            </div>
-                          ) : (
-                            <button onClick={() => addToCart(item)} className="bg-orange-50 text-orange-600 px-4 py-2 rounded-lg text-xs font-bold hover:bg-orange-100">담기</button>
-                          )
-                        )}
+                        <div className="flex justify-between items-end mt-2">
+                          <span className="font-bold text-gray-900">{item.price.toLocaleString()}원</span>
+                          
+                          {!item.soldOut && (
+                            cartItem ? (
+                              <div className="flex items-center bg-gray-50 rounded-lg border border-gray-200">
+                                <button onClick={() => removeFromCart(item.menuId)} className="p-1.5 text-gray-500 hover:text-gray-900 transition-colors"><Minus size={16} strokeWidth={3} /></button>
+                                <span className="w-6 text-center text-sm font-bold text-gray-800">{cartItem.quantity}</span>
+                                <button onClick={() => addToCart(item)} className="p-1.5 text-gray-500 hover:text-gray-900 transition-colors"><Plus size={16} strokeWidth={3} /></button>
+                              </div>
+                            ) : (
+                              <button onClick={() => addToCart(item)} className="bg-orange-50 text-orange-600 px-4 py-2 rounded-lg text-xs font-bold hover:bg-orange-100">담기</button>
+                            )
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })
+                  );
+                })}
+                
+                {/* [수정 2] 모든 메뉴가 렌더링된 후 맨 마지막에 항상 표시되는 안내 문구 */}
+                <div className="py-8 pb-12 flex justify-center items-center">
+                  <p className="text-xs text-gray-400 font-medium bg-gray-50 px-4 py-2 rounded-lg">
+                    ✨ 메뉴 이미지는 AI로 만든 참고용 사진 입니다.
+                  </p>
+                </div>
+              </>
             )}
           </main>
         </>
