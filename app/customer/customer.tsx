@@ -31,6 +31,7 @@ const CALL_PRESETS = [
 const API_BASE_URL = "/api";
 
 export default function OrderPage() {
+  // 상태 변수는 'qrToken'으로 통일하여 사용합니다.
   const [qrToken, setQrToken] = useState<string | null>(null);
   const [displayTableNum, setDisplayTableNum] = useState<string | null>(null);
   
@@ -51,14 +52,20 @@ export default function OrderPage() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    // Nginx를 통과한 토큰 가져오기
-    const token = params.get("qtnum") || params.get("qt") || params.get("qrToken") || "";
-    setQrToken(token);
+    // Nginx를 통과한 토큰 가져오기 (초기 로딩 시 파싱되는 값)
+    const initialToken = params.get("qt") || "";
+    setQrToken(initialToken);
 
     // --- [GET] DB와 통신하여 유효한 토큰인지 확인하고 테이블 번호 로딩 ---
-    const loadTableAndMenus = async (qt: string) => {
+    const loadTableAndMenus = async (tokenString: string) => {
+      if (!tokenString) {
+        setStep('ACCESS_DENIED');
+        return;
+      }
+
       try {
-        const response = await fetch(`${API_BASE_URL}/qtnum?qt=${qt}`);
+        // 백엔드 API 명세(?qt=)에 맞춰 통신
+        const response = await fetch(`${API_BASE_URL}/qtnum?qt=${tokenString}`);
         const result = await response.json();
 
         if (result.success && result.data && result.data.tableNumber) {
@@ -75,8 +82,7 @@ export default function OrderPage() {
       }
     };
 
-    // 파라미터가 없는 경우는 Nginx가 이미 잡았으므로, 바로 API 호출
-    loadTableAndMenus(token);
+    loadTableAndMenus(initialToken);
   }, []);
 
   const fetchMenus = async () => {
@@ -219,7 +225,7 @@ export default function OrderPage() {
         </div>
       )}
 
-      {/* 🚫 접근 거부 화면 (가짜 토큰 방어용) */}
+      {/* 🚫 접근 거부 화면 */}
       {step === 'ACCESS_DENIED' && (
         <div className="fixed inset-0 bg-white flex flex-col items-center justify-center p-8 z-50">
           <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-6">
@@ -249,13 +255,13 @@ export default function OrderPage() {
                   <BellRing className="w-6 h-6" />
                   <span className="text-[10px] font-bold mt-0.5">호출</span>
                 </button>
-                <Link href="/customer/orders" className="p-2 text-gray-700 hover:bg-gray-100 rounded-full transition-colors">
+                {/* 🚨 기존 에러 수정됨: token -> qrToken */}
+                <Link href={`/customer/orders?qt=${qrToken || ""}`} className="p-2 text-gray-700 hover:bg-gray-100 rounded-full transition-colors">
                   <ReceiptText className="w-6 h-6" />
                   <span className="text-[10px] font-bold mt-0.5"> 내역</span>
                 </Link>
               </div>
             </header>
-
             <div className="flex gap-2 overflow-x-auto px-4 py-3 border-b border-gray-100 scrollbar-hide">
               {categories.map(cat => (
                 <button 
