@@ -22,7 +22,7 @@ export default function AccessDeniedPage() {
           매장 직원에게 문의해 주시기 바랍니다.
         </p>
 
-        {/* 안내 문구 또는 추가 액션 버튼 (필요 시 주석 해제 후 사용) */}
+        {/*
         <div className="w-full bg-gray-50 p-4 rounded-2xl border border-gray-100 flex items-start gap-3 text-left">
           <AlertTriangle className="text-orange-500 w-5 h-5 shrink-0 mt-0.5" />
           <div className="text-xs text-gray-600 leading-normal">
@@ -30,6 +30,7 @@ export default function AccessDeniedPage() {
             브라우저의 주소창에 <code className="bg-gray-200 px-1 py-0.5 rounded font-mono text-[11px]">?qtnum=토큰값</code> 형식을 포함하여 정상적인 경로로 접근했는지 확인해 주세요.
           </div>
         </div>
+        */}
 
       </div>
     </div>

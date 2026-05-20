@@ -20,7 +20,6 @@ interface CartItem extends MenuItem {
   quantity: number;
 }
 
-// 📌 직원 호출 추천 문구 리스트
 const CALL_PRESETS = [
   "문제가 생겼어요",
   "앞접시 주세요",
@@ -29,7 +28,6 @@ const CALL_PRESETS = [
   "기타(직접 입력)"
 ];
 
-// 📌 API Base URL 설정
 const API_BASE_URL = "/api";
 
 export default function OrderPage() {
@@ -43,11 +41,9 @@ export default function OrderPage() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
   
-  // 🔄 검증 단계를 위해 'LOADING' 및 'ACCESS_DENIED' 추가
   const [step, setStep] = useState<'LOADING' | 'MENU' | 'PAYMENT' | 'CALL_SENT' | 'ACCESS_DENIED'>('LOADING');
   const [isLoading, setIsLoading] = useState(false);
 
-  // 🔔 직원 호출 관련 상태
   const [isCallModalOpen, setIsCallModalOpen] = useState(false);
   const [selectedCall, setSelectedCall] = useState<string>(CALL_PRESETS[0]);
   const [customCallText, setCustomCallText] = useState("");
@@ -55,71 +51,48 @@ export default function OrderPage() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const token = params.get("qt");
-    
-    // 토큰이 아예 없다면 즉시 접근 거부
-    if (!token) {
-      setStep('ACCESS_DENIED');
-      return;
-    }
-    
+    // Nginx를 통과한 토큰 가져오기
+    const token = params.get("qtnum") || params.get("qt") || params.get("qrToken") || "";
     setQrToken(token);
 
-    // --- [GET] 테이블 번호 필수 검증 API ---
-    const verifyTableAndFetchMenus = async (qt: string) => {
+    // --- [GET] DB와 통신하여 유효한 토큰인지 확인하고 테이블 번호 로딩 ---
+    const loadTableAndMenus = async (qt: string) => {
       try {
         const response = await fetch(`${API_BASE_URL}/qtnum?qt=${qt}`);
-        
-        if (!response.ok) {
-          throw new Error('테이블 정보 조회 실패');
-        }
-
         const result = await response.json();
 
-        // 성공하고 유효한 tableNumber 값이 있을 때만 통과
         if (result.success && result.data && result.data.tableNumber) {
           setDisplayTableNum(result.data.tableNumber.toString());
-          
-          // 테이블 정보가 정상 확인된 후에만 메뉴 목록 조회
           await fetchMenus();
           setStep('MENU'); 
         } else {
-          console.error("테이블 정보 불일치:", result.message);
+          // DB에 없는 가짜 토큰이거나 만료된 토큰일 경우 튕겨냄
           setStep('ACCESS_DENIED');
         }
       } catch (error) {
-        console.error("테이블 검증 API 에러:", error);
+        console.error("테이블 데이터 로딩 에러:", error);
         setStep('ACCESS_DENIED');
       }
     };
 
-    verifyTableAndFetchMenus(token);
+    // 파라미터가 없는 경우는 Nginx가 이미 잡았으므로, 바로 API 호출
+    loadTableAndMenus(token);
   }, []);
 
-  // --- 1. [GET] 전체 메뉴 조회 API ---
   const fetchMenus = async () => {
     try {
       const response = await fetch(`${API_BASE_URL}/menus`);
-      
-      if (!response.ok) {
-        throw new Error('네트워크 응답이 정상이 아닙니다.');
-      }
-
       const result = await response.json();
 
       if (result.success) {
         const fetchedMenus = result.data.menus;
         setMenuList(fetchedMenus);
-        
-        // 동적 카테고리 탭 생성
         const uniqueCategories = Array.from(new Set(fetchedMenus.map((m: MenuItem) => m.categoryName))) as string[];
         setCategories(["All", ...uniqueCategories]);
       } else {
-        console.error("메뉴 목록 조회 실패:", result.message);
         alert(result.message || "메뉴를 불러오지 못했습니다.");
       }
     } catch (error) {
-      console.error("API 연동 에러:", error);
       alert("서버와 통신하는 중 에러가 발생했습니다.");
     }
   };
@@ -128,7 +101,6 @@ export default function OrderPage() {
     ? menuList 
     : menuList.filter(item => item.categoryName === activeCategory);
   
-  // 장바구니 담기
   const addToCart = (item: MenuItem) => {
     if (item.soldOut) return;
     setCart(prev => {
@@ -152,7 +124,7 @@ export default function OrderPage() {
 
   const handleCheckoutReady = () => {
     if (!qrToken) {
-      alert("유효하지 않은 QR 코드입니다.");
+      alert("유효하지 않은 주문입니다.");
       return;
     }
     setIsCartOpen(false); 
@@ -167,12 +139,10 @@ export default function OrderPage() {
       setIsCopied(true);
       setTimeout(() => setIsCopied(false), 2000);
     } catch (err) {
-      console.error('계좌번호 복사 실패:', err);
       alert('계좌번호 복사에 실패했습니다.');
     }
   };
 
-  // --- 2. [POST] 장바구니 주문 대기 등록 API ---
   const submitOrder = async () => {
     if (!qrToken || cart.length === 0) return;
     setIsLoading(true);
@@ -198,14 +168,12 @@ export default function OrderPage() {
         alert(result.message || "주문 처리 중 오류가 발생했습니다.");
       }
     } catch (error) {
-      console.error(error);
       alert("서버와 통신하는 중 에러가 발생했습니다.");
     } finally {
       setIsLoading(false);
     }
   };
 
-  // --- 3. [POST] 직원 호출 API ---
   const submitStaffCall = async () => {
     const messageToSend = selectedCall === "기타(직접 입력)" ? customCallText : selectedCall;
     
@@ -217,11 +185,7 @@ export default function OrderPage() {
     setIsCallLoading(true);
 
     try {
-      const payload = {
-        qrToken: qrToken,
-        message: messageToSend
-      };
-
+      const payload = { qrToken: qrToken, message: messageToSend };
       const response = await fetch(`${API_BASE_URL}/staff-call`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -239,7 +203,6 @@ export default function OrderPage() {
         alert(result.message || "호출 중 오류가 발생했습니다.");
       }
     } catch (error) {
-      console.error(error);
       alert("서버와 통신하는 중 에러가 발생했습니다.");
     } finally {
       setIsCallLoading(false);
@@ -256,15 +219,15 @@ export default function OrderPage() {
         </div>
       )}
 
-      {/* 🚫 접근 거부 화면 */}
+      {/* 🚫 접근 거부 화면 (가짜 토큰 방어용) */}
       {step === 'ACCESS_DENIED' && (
         <div className="fixed inset-0 bg-white flex flex-col items-center justify-center p-8 z-50">
           <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-6">
             <X className="text-red-600" size={32} />
           </div>
-          <h2 className="text-2xl font-black text-gray-900 mb-2 text-center">접근이 거부되었습니다</h2>
+          <h2 className="text-2xl font-black text-gray-900 mb-2 text-center">유효하지 않은 테이블입니다</h2>
           <p className="text-gray-500 text-center mb-8 text-sm leading-relaxed">
-            유효하지 않은 QR 코드이거나 테이블 정보가 확인되지 않습니다.<br />
+            토큰 정보가 일치하지 않거나 만료되었습니다.<br />
             매장 직원에게 문의하거나 QR 코드를 다시 스캔해주세요.
           </p>
         </div>
