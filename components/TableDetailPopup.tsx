@@ -158,9 +158,7 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
         headers: {
           "Authorization": `Bearer ${tokenStr}`,
           "Content-Type": "application/json"
-        },
-        // 백엔드 프레임워크에 따라 JSON Content-Type일 때 바디가 아예 없으면 에러를 낼 수 있으므로 빈 객체 전송
-        body: JSON.stringify({}) 
+        }
       });
 
       if (response.status === 401 || response.status === 403) {
@@ -168,25 +166,17 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
         return;
       }
 
-      // 서버에서 200번대 응답이 오지 않았을 경우의 예외 처리 강화
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => null);
-        console.error("테이블 초기화 실패 응답:", errorData || response.statusText);
-        alert(errorData?.message || `테이블 정리에 실패했습니다. (상태 코드: ${response.status})`);
-        return;
-      }
-
       const result = await response.json();
       
       if (result.success) {
         alert("테이블 정리가 완료되었습니다.");
-        onClose(); // 팝업 닫기
+        onClose(); // 팝업 닫기 (이후 SSE 이벤트를 통해 메인 화면 자동 갱신됨)
       } else {
         alert(result.message || "테이블 정리에 실패했습니다.");
       }
     } catch (error) {
       console.error("테이블 초기화 API 호출 오류:", error);
-      alert("서버와 통신하는 중 오류가 발생했습니다.");
+      alert("오류가 발생했습니다.");
     }
   };
 
