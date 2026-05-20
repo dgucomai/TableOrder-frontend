@@ -63,10 +63,9 @@ function CaisinoHome() {
         </p>
       </div>
 
-      {/* 2. 기존 href 변경: 기존 qt=22 뒤에 &qtnum=토큰값 추가 */}
-      <Link href={`/customer?qt=22&qtnum=${token}`} className="w-full max-w-[280px] sm:max-w-xs">
+      <Link href={`/customer?qtnum=${token}`} className="w-full max-w-[280px] sm:max-w-xs">
         <button className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-4 sm:py-5 px-6 sm:px-8 rounded-2xl shadow-lg hover:shadow-xl transition-all active:scale-95 text-lg sm:text-xl">
-          주문 하러 가기(qt=22)
+          주문 하러 가기
         </button>
       </Link>
       
