@@ -55,7 +55,8 @@ export default function OrderPage() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const token = params.get("qt") || params.get("qrToken");
+    // qtnum 파라미터도 함께 조회하도록 추가
+    const token = params.get("qt") || params.get("qrToken") || params.get("qtnum");
     
     // 토큰이 아예 없다면 즉시 접근 거부
     if (!token) {
@@ -76,11 +77,8 @@ export default function OrderPage() {
 
         const result = await response.json();
 
-        // 성공하고 유효한 tableNumber 값이 있을 때만 통과
         if (result.success && result.data && result.data.tableNumber) {
           setDisplayTableNum(result.data.tableNumber.toString());
-          
-          // 테이블 정보가 정상 확인된 후에만 메뉴 목록 조회
           await fetchMenus();
           setStep('MENU'); 
         } else {
