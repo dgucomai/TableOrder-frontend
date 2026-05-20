@@ -55,7 +55,7 @@ export default function OrderPage() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const token = params.get("qt") || params.get("qrToken");
+    const token = params.get("qt");
     
     // 토큰이 아예 없다면 즉시 접근 거부
     if (!token) {
