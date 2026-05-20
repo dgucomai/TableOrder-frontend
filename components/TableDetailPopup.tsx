@@ -33,24 +33,48 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
   const [timeToDelete, setTimeToDelete] = useState<string | null>(null);
   const [deleteReason, setDeleteReason] = useState("");
 
-  const [activeCalls, setActiveCalls] = useState<CallInfo[]>([
-    { id: "c1", type: "입금 확인", time: "21:05" },
-    { id: "c2", type: "딜러 호출", time: "21:12" },
-    { id: "c3", type: "직원 호출", time: "21:15" },
-  ]);
-
-  const [orders, setOrders] = useState<Order[]>([
-    { id: "1", name: "토마토 브뤨레", quantity: 2, price: 16000, time: "20:30", status: "제공 완료", isTokenPayment: false },
-    { id: "2", name: "나초 치즈", quantity: 1, price: 12, time: "21:10", status: "준비 중", isTokenPayment: true },
-    { id: "3", name: "어묵탕", quantity: 1, price: 9000, time: "21:10", status: "준비 중", isTokenPayment: false },
-    { id: "4", name: "잭다니엘 허니", quantity: 1, price: 12000, time: "21:20", status: "입금 확인 대기", isTokenPayment: false },
-    { id: "5", name: "모듬 과일", quantity: 1, price: 25000, time: "21:20", status: "입금 확인 대기", isTokenPayment: false },
-  ]);
+  const [activeCalls, setActiveCalls] = useState<CallInfo[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
 
   useEffect(() => {
-    const timer = setInterval(() => setCurrentTime(new Date()), 60000);
-    return () => clearInterval(timer);
-  }, []);
+    const fetchTableDetail = async () => {
+      try {
+        const token = localStorage.getItem("staffAccessToken") || "";
+        
+        // 상세 조회 API 호출 (명세서에 맞게 URL 조정 필요)
+        const response = await fetch(`/api/staff/tables/${tableId}`, {
+          method: "GET",
+          headers: {
+            "Authorization": `Bearer ${token}`,
+            "Content-Type": "application/json"
+          }
+        });
+
+        if (response.status === 401 || response.status === 403) {
+          alert(response.status === 401 ? "로그인이 필요합니다." : "직원 권한이 필요합니다.");
+          window.location.href = "/staff";
+          return;
+        }
+
+        const result = await response.json();
+
+        // 핵심 반영 부분: result.data 안에 실제 정보가 있다고 가정하고 처리합니다.
+        if (result.success && result.data) {
+          // 백엔드 API 명세에 따라 아래 필드명(orders, calls 등)은 다를 수 있습니다.
+          // 백엔드 응답 구조에 맞게 매핑해주세요.
+          if (result.data.orders) setOrders(result.data.orders);
+          if (result.data.activeCalls) setActiveCalls(result.data.activeCalls);
+          if (result.data.tokens !== undefined) setTokens(result.data.tokens);
+        }
+      } catch (error) {
+        console.error("테이블 상세 정보 조회 실패:", error);
+      }
+    };
+
+    if (tableId) {
+      fetchTableDetail();
+    }
+  }, [tableId]);
 
   const usageTime = useMemo(() => {
     if (orders.length === 0) return "0분";
