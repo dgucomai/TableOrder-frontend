@@ -21,14 +21,18 @@ interface CallInfo {
 }
 
 export default function TableDetailPopup({ tableId, onClose }: { tableId: number; onClose: () => void }) {
-  const [tokens, setTokens] = useState(7);
+  const [tokens, setTokens] = useState(0);
   const [isEditTokenOpen, setIsEditTokenOpen] = useState(false);
   const [isResetOpen, setIsResetOpen] = useState(false);
   const [editReason, setEditReason] = useState("");
-  const [editBalance, setEditBalance] = useState(tokens.toString());
+  const [editBalance, setEditBalance] = useState("");
   const [currentTime, setCurrentTime] = useState(new Date());
 
-  // --- 추가/수정된 상태: 주문 그룹 전체 삭제 관련 ---
+  // --- API로 받아올 추가 상태 ---
+  const [totalAmount, setTotalAmount] = useState(0);
+  const [startedAt, setStartedAt] = useState<string | null>(null);
+
+  // --- 주문 그룹 전체 삭제 관련 상태 ---
   const [isDeleteOrderOpen, setIsDeleteOrderOpen] = useState(false);
   const [timeToDelete, setTimeToDelete] = useState<string | null>(null);
   const [deleteReason, setDeleteReason] = useState("");
@@ -36,12 +40,36 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
   const [activeCalls, setActiveCalls] = useState<CallInfo[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
 
+  // --- 헬퍼 함수 ---
+  // 1. ISO 날짜 문자열에서 HH:mm 추출
+  const formatTime = (isoString: string | null) => {
+    if (!isoString) return "";
+    const date = new Date(isoString);
+    return `${date.getHours().toString().padStart(2, "0")}:${date.getMinutes().toString().padStart(2, "0")}`;
+  };
+
+  // 2. 백엔드 주문 상태를 프론트엔드 UI 상태로 매핑
+  const mapOrderStatus = (backendStatus: string) => {
+    switch (backendStatus) {
+      case "PAYMENT_PENDING": return "입금 확인 대기";
+      case "PREPARING": return "준비 중";
+      case "COMPLETED": return "제공 완료";
+      default: return "준비 중";
+    }
+  };
+
+  // --- 실시간 시간 업데이트 (이용 시간 갱신용) ---
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(new Date()), 60000); // 1분마다 갱신
+    return () => clearInterval(timer);
+  }, []);
+
+  // --- API 데이터 Fetch ---
   useEffect(() => {
     const fetchTableDetail = async () => {
       try {
         const token = localStorage.getItem("staffAccessToken") || "";
         
-        // 상세 조회 API 호출 (명세서에 맞게 URL 조정 필요)
         const response = await fetch(`/api/staff/tables/${tableId}`, {
           method: "GET",
           headers: {
@@ -51,20 +79,75 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
         });
 
         if (response.status === 401 || response.status === 403) {
-          alert(response.status === 401 ? "로그인이 필요합니다." : "직원 권한이 필요합니다.");
+          alert("권한이 없습니다. 다시 로그인해 주세요.");
           window.location.href = "/staff";
           return;
         }
 
         const result = await response.json();
 
-        // 핵심 반영 부분: result.data 안에 실제 정보가 있다고 가정하고 처리합니다.
         if (result.success && result.data) {
-          // 백엔드 API 명세에 따라 아래 필드명(orders, calls 등)은 다를 수 있습니다.
-          // 백엔드 응답 구조에 맞게 매핑해주세요.
-          if (result.data.orders) setOrders(result.data.orders);
-          if (result.data.activeCalls) setActiveCalls(result.data.activeCalls);
-          if (result.data.tokens !== undefined) setTokens(result.data.tokens);
+          const tableData = result.data;
+
+          // 1. 기본 정보 세팅
+          setTokens(tableData.tokenCount || 0);
+          setTotalAmount(tableData.totalAmount || 0);
+          setStartedAt(tableData.startedAt || null);
+
+          // 2. 호출 리스트 세팅 (일반 호출 + 입금 확인 요청 병합)
+          const mappedCalls: CallInfo[] = [];
+          
+          if (tableData.calls) {
+            tableData.calls.forEach((c: any) => {
+              if (c.status === "REQUESTED") { 
+                mappedCalls.push({
+                  id: `call-${c.callId}`,
+                  type: c.callType === "DEALER" ? "딜러 호출" : "직원 호출",
+                  time: formatTime(c.createdAt)
+                });
+              }
+            });
+          }
+          
+          if (tableData.paymentRequests) {
+            tableData.paymentRequests.forEach((pr: any) => {
+              if (pr.paymentStatus === "PENDING") {
+                mappedCalls.push({
+                  id: `pr-${pr.paymentRequestId}`,
+                  type: "입금 확인",
+                  time: formatTime(pr.requestedAt)
+                });
+              }
+            });
+          }
+          
+          // 시간순 정렬
+          mappedCalls.sort((a, b) => a.time.localeCompare(b.time));
+          setActiveCalls(mappedCalls);
+
+          // 3. 주문(Orders) 및 상세 항목(Items) 세팅
+          const mappedOrders: Order[] = [];
+          if (tableData.orders) {
+            tableData.orders.forEach((order: any) => {
+              const timeStr = formatTime(order.createdAt);
+              const statusStr = mapOrderStatus(order.orderStatus);
+
+              if (order.items) {
+                order.items.forEach((item: any) => {
+                  mappedOrders.push({
+                    id: `${order.orderId}-${item.orderItemId}`,
+                    name: item.menuName,
+                    quantity: item.quantity,
+                    price: item.unitPrice,
+                    time: timeStr,
+                    status: statusStr as Order["status"],
+                    isTokenPayment: false
+                  });
+                });
+              }
+            });
+          }
+          setOrders(mappedOrders);
         }
       } catch (error) {
         console.error("테이블 상세 정보 조회 실패:", error);
@@ -76,26 +159,21 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
     }
   }, [tableId]);
 
+  // --- 백엔드의 startedAt 기반으로 이용 시간 정확하게 계산 ---
   const usageTime = useMemo(() => {
-    if (orders.length === 0) return "0분";
-    const times = orders.map(o => o.time);
-    const firstOrderTimeStr = times.reduce((prev, curr) => (prev < curr ? prev : curr));
-    const [hours, minutes] = firstOrderTimeStr.split(':').map(Number);
-    const firstOrderDate = new Date();
-    firstOrderDate.setHours(hours, minutes, 0);
-    const diffMs = currentTime.getTime() - firstOrderDate.getTime();
+    if (!startedAt) return "0분";
+    const start = new Date(startedAt);
+    const diffMs = currentTime.getTime() - start.getTime();
     const diffMins = Math.floor(diffMs / 60000);
     if (diffMins < 0) return "0분";
+    
     const h = Math.floor(diffMins / 60);
     const m = diffMins % 60;
     return h > 0 ? `${h}시간 ${m}분` : `${m}분`;
-  }, [orders, currentTime]);
+  }, [startedAt, currentTime]);
 
   const handleAcceptCall = (id: string) => setActiveCalls(prev => prev.filter(call => call.id !== id));
 
-  // --- 상태 업데이트 핸들러 ---
-  
-  // 1. 그룹 단위 입금 확인 처리
   const confirmGroupDeposit = (time: string) => {
     setOrders(prev => prev.map(order => 
       order.time === time && order.status === "입금 확인 대기" 
@@ -104,7 +182,6 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
     ));
   };
 
-  // 2. 개별 메뉴 준비 중/제공 완료 토글
   const toggleOrderStatus = (id: string) => {
     setOrders(prev => prev.map(order => {
       if (order.id !== id || order.status === "입금 확인 대기") return order;
@@ -112,7 +189,6 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
     }));
   };
 
-  // 3. 주문 그룹 전체 취소 클릭 핸들러
   const handleDeleteGroupClick = (time: string) => {
     setIsEditTokenOpen(false);
     setIsResetOpen(false);
@@ -121,7 +197,6 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
     setIsDeleteOrderOpen(true);
   };
 
-  // 4. 주문 그룹 전체 취소 실행 (해당 시간대의 주문 일괄 삭제)
   const executeDeleteGroup = () => {
     if (!timeToDelete) return;
     setOrders(prev => prev.filter(order => order.time !== timeToDelete));
@@ -146,8 +221,6 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
     return acc;
   }, {});
 
-  const totalPrice = orders.filter(o => !o.isTokenPayment).reduce((sum, o) => sum + (o.price * o.quantity), 0);
-
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-md p-0 sm:p-4" onClick={onClose}>
       <div className={`flex flex-col md:flex-row transition-all duration-500 w-full h-full sm:h-[90vh] max-w-[1400px] ${(isEditTokenOpen || isResetOpen || isDeleteOrderOpen) ? "md:-translate-x-[5vw]" : ""}`} onClick={(e) => e.stopPropagation()}>
@@ -160,7 +233,8 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
               <div className="flex items-center gap-4 sm:gap-10 border-l border-white/10 pl-4 sm:pl-10">
                 <div className="flex flex-col">
                   <span className="text-[10px] sm:text-[12px] text-slate-500 font-bold uppercase tracking-widest">총 금액</span>
-                  <span className="text-lg sm:text-3xl font-black text-white">{totalPrice.toLocaleString()}원</span>
+                  {/* 프론트 계산 값 대신 백엔드에서 준 totalAmount 사용 */}
+                  <span className="text-lg sm:text-3xl font-black text-white">{totalAmount.toLocaleString()}원</span>
                 </div>
                 <div className="flex flex-col border-l border-white/5 pl-4 sm:pl-10">
                   <span className="text-[10px] sm:text-[12px] text-cyan-600 font-bold uppercase tracking-widest flex items-center gap-1">
@@ -203,7 +277,6 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
                     <div className="flex justify-between items-center mb-4 border-b border-white/5 pb-3">
                       <div className="text-[13px] text-slate-500 font-mono">주문시간: {time}</div>
                       
-                      {/* 그룹 단위 액션 버튼들 */}
                       {isWaitingDeposit && (
                         <div className="flex items-center gap-2">
                           <button 
@@ -230,7 +303,6 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
                             <span className="text-xs text-slate-500">{order.price.toLocaleString()}{order.isTokenPayment ? 'T' : '원'} · {order.quantity}개</span>
                           </div>
                           
-                          {/* 개별 상태 버튼 (취소 버튼 제거됨) */}
                           {order.status === "입금 확인 대기" ? (
                             <div className="flex items-center gap-2 text-emerald-500/50 font-black text-xs uppercase bg-emerald-500/5 px-3 py-2 rounded-lg border border-emerald-500/10">
                               <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
@@ -256,7 +328,7 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
           </div>
           
           <div className="p-4 sm:p-8 bg-slate-900/40 border-t border-white/5 flex flex-col sm:flex-row gap-3">
-            <button onClick={() => { setIsResetOpen(false); setIsDeleteOrderOpen(false); setIsEditTokenOpen(!isEditTokenOpen); }} className="flex-1 bg-slate-700 hover:bg-slate-600 text-white py-4 sm:py-6 rounded-2xl font-black text-lg sm:text-xl flex items-center justify-center gap-3 active:scale-95">
+            <button onClick={() => { setIsResetOpen(false); setIsDeleteOrderOpen(false); setIsEditTokenOpen(!isEditTokenOpen); setEditBalance(tokens.toString()); }} className="flex-1 bg-slate-700 hover:bg-slate-600 text-white py-4 sm:py-6 rounded-2xl font-black text-lg sm:text-xl flex items-center justify-center gap-3 active:scale-95">
               <Coins size={20} className="text-yellow-500" /> 토큰 수량 수정
             </button>
             <button onClick={() => { setIsEditTokenOpen(false); setIsDeleteOrderOpen(false); setIsResetOpen(!isResetOpen); }} className="flex-1 bg-orange-600 hover:bg-orange-500 text-white py-4 sm:py-6 rounded-2xl font-black text-lg sm:text-xl flex items-center justify-center gap-3 active:scale-95">
@@ -275,6 +347,12 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
               <div className="p-10 space-y-8">
                 <h3 className="text-2xl font-black text-yellow-500 italic flex items-center gap-2 uppercase tracking-tighter"><Coins size={28} /> 토큰 수정</h3>
                 <div className="space-y-6">
+                  <div>
+                    <label className="text-[12px] text-slate-500 font-bold block mb-2 uppercase tracking-widest">현재 보유 토큰</label>
+                    <div className="w-full bg-[#0f172a]/50 border border-white/5 rounded-xl p-4 text-center">
+                      <span className="text-2xl font-black text-white">{tokens} T</span>
+                    </div>
+                  </div>
                   <div>
                     <label className="text-[12px] text-slate-500 font-bold block mb-2 uppercase tracking-widest">수정 사유</label>
                     <input type="text" placeholder="사유 입력 (필수)" value={editReason} onChange={(e) => setEditReason(e.target.value)} className="w-full bg-[#0f172a] border border-white/10 rounded-xl p-4 text-sm font-bold outline-none focus:ring-1 focus:ring-yellow-500 text-slate-200" />
