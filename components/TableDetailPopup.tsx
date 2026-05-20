@@ -21,6 +21,7 @@ interface CallInfo {
 }
 
 export default function TableDetailPopup({ tableId, onClose }: { tableId: number; onClose: () => void }) {
+  const [tableNumber, setTableNumber] = useState<number | null>(null); // 테이블 번호 상태 추가
   const [tokens, setTokens] = useState(0);
   const [isEditTokenOpen, setIsEditTokenOpen] = useState(false);
   const [isResetOpen, setIsResetOpen] = useState(false);
@@ -90,14 +91,16 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
           const tableData = result.data;
 
           // 1. 기본 정보 세팅
-          setTokens(tableData.tokenCount || 0);
-          setTotalAmount(tableData.totalAmount || 0);
+          setTableNumber(tableData.tableNumber); // API 명세의 tableNumber 반영
+          setTokens(tableData.tokenCount || 0); // API 명세의 tokenCount 반영
+          // 금액 관련 필드가 tokenAmount 또는 totalAmount로 올 경우를 대비하여 처리
+          setTotalAmount(tableData.totalAmount ?? tableData.tokenAmount ?? 0); 
           setStartedAt(tableData.startedAt || null);
 
           // 2. 호출 리스트 세팅 (일반 호출 + 입금 확인 요청 병합)
           const mappedCalls: CallInfo[] = [];
           
-          if (tableData.calls) {
+          if (tableData.calls && Array.isArray(tableData.calls)) {
             tableData.calls.forEach((c: any) => {
               if (c.status === "REQUESTED") { 
                 mappedCalls.push({
@@ -109,7 +112,8 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
             });
           }
           
-          if (tableData.paymentRequests) {
+          // paymentRequests가 응답에 포함되어 있다면 처리 (없으면 무시)
+          if (tableData.paymentRequests && Array.isArray(tableData.paymentRequests)) {
             tableData.paymentRequests.forEach((pr: any) => {
               if (pr.paymentStatus === "PENDING") {
                 mappedCalls.push({
@@ -127,12 +131,12 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
 
           // 3. 주문(Orders) 및 상세 항목(Items) 세팅
           const mappedOrders: Order[] = [];
-          if (tableData.orders) {
+          if (tableData.orders && Array.isArray(tableData.orders)) {
             tableData.orders.forEach((order: any) => {
               const timeStr = formatTime(order.createdAt);
               const statusStr = mapOrderStatus(order.orderStatus);
 
-              if (order.items) {
+              if (order.items && Array.isArray(order.items)) {
                 order.items.forEach((item: any) => {
                   mappedOrders.push({
                     id: `${order.orderId}-${item.orderItemId}`,
@@ -229,11 +233,13 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
           {/* Header */}
           <div className="px-6 py-4 sm:px-10 sm:py-6 border-b border-white/5 flex justify-between items-center bg-slate-800/40">
             <div className="flex items-center gap-4 sm:gap-12">
-              <h2 className="text-4xl sm:text-6xl font-black text-orange-500 italic tracking-tighter">{tableId}</h2>
+              {/* tableId 대신 백엔드에서 받은 tableNumber 노출 (없으면 fallback으로 id 표시) */}
+              <h2 className="text-4xl sm:text-6xl font-black text-orange-500 italic tracking-tighter">
+                {tableNumber !== null ? tableNumber : tableId}
+              </h2>
               <div className="flex items-center gap-4 sm:gap-10 border-l border-white/10 pl-4 sm:pl-10">
                 <div className="flex flex-col">
                   <span className="text-[10px] sm:text-[12px] text-slate-500 font-bold uppercase tracking-widest">총 금액</span>
-                  {/* 프론트 계산 값 대신 백엔드에서 준 totalAmount 사용 */}
                   <span className="text-lg sm:text-3xl font-black text-white">{totalAmount.toLocaleString()}원</span>
                 </div>
                 <div className="flex flex-col border-l border-white/5 pl-4 sm:pl-10">
@@ -337,9 +343,8 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
           </div>
         </motion.div>
         
-        {/* 사이드 팝업 영역 */}
+        {/* 사이드 팝업 영역 (생략 없이 원본 유지) */}
         <AnimatePresence mode="wait">
-          {/* 토큰 수정 팝업 */}
           {isEditTokenOpen && (
             <motion.div key="token-edit" initial={{ x: "100%", opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: "100%", opacity: 0 }}
               className="fixed inset-0 md:relative md:inset-auto z-20 md:z-0 bg-slate-900/95 md:bg-slate-800 border-l border-white/10 md:rounded-r-[2rem] w-full md:w-[350px] flex flex-col justify-center shadow-2xl">
@@ -369,7 +374,6 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
             </motion.div>
           )}
 
-          {/* 테이블 초기화 팝업 */}
           {isResetOpen && (
             <motion.div key="table-reset" initial={{ x: "100%", opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: "100%", opacity: 0 }}
               className="fixed inset-0 md:relative md:inset-auto z-20 md:z-0 bg-slate-900/95 md:bg-slate-800 border-l border-white/10 md:rounded-r-[2rem] w-full md:w-[350px] flex flex-col justify-center shadow-2xl">
@@ -385,7 +389,6 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
             </motion.div>
           )}
 
-          {/* 주문 전체 취소 팝업 */}
           {isDeleteOrderOpen && (
             <motion.div key="order-delete" initial={{ x: "100%", opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: "100%", opacity: 0 }}
               className="fixed inset-0 md:relative md:inset-auto z-20 md:z-0 bg-slate-900/95 md:bg-slate-800 border-l border-white/10 md:rounded-r-[2rem] w-full md:w-[350px] flex flex-col justify-center shadow-2xl">
