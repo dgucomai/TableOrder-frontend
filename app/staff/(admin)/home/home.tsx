@@ -306,7 +306,7 @@ export default function AdminHomePage() {
                     ${isFilteredOut ? 'opacity-10 pointer-events-none grayscale' : 'active:scale-90 active:border-white/50'}
                   `}
                 >
-                  <span className="font-black text-slate-100 text-lg">{table.id}</span>
+                  <span className="font-black text-slate-100 text-lg">{table.number}</span>
                   {config.icon && <span className="absolute top-1 right-1.5 text-[10px]">{config.icon}</span>}
                 </button>
               );
