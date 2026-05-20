@@ -55,41 +55,37 @@ export default function AdminHomePage() {
     // 임시: 로컬 스토리지 등에서 JWT 토큰을 가져온다고 가정
     const token = localStorage.getItem("staffAccessToken") || "";
 
-// home.tsx 파일의 useEffect 내 fetchInitialTables 함수를 찾아서 수정해주세요.
+    const fetchInitialTables = async () => {
+      try {
+        const response = await fetch("/api/staff/tables", {
+          method: "GET",
+          headers: {
+            "Authorization": `Bearer ${token}`,
+            "Content-Type": "application/json"
+          }
+        });
 
-  const fetchInitialTables = async () => {
-    try {
-      const token = localStorage.getItem("staffAccessToken") || "";
-      const response = await fetch("/api/staff/tables", {
-        method: "GET",
-        headers: {
-          "Authorization": `Bearer ${token}`,
-          "Content-Type": "application/json"
+        // 명세서 기반 인증 예외 처리 (401, 403)
+        if (response.status === 401 || response.status === 403) {
+          alert(response.status === 401 ? "로그인이 필요합니다." : "직원 권한이 필요합니다.");
+          window.location.href = "/staff";
+          return;
         }
-      });
 
-      if (response.status === 401 || response.status === 403) {
-        alert(response.status === 401 ? "로그인이 필요합니다." : "직원 권한이 필요합니다.");
-        window.location.href = "/staff";
-        return;
+        const result = await response.json();
+        // result 자체가 아닌 result.data가 배열인지 확인하도록 수정
+        if (result.success && Array.isArray(result.data)) {
+          const formattedTables = result.data.map((t: any) => ({
+            id: t.tableId, 
+            number: t.tableNumber,
+            status: mapBackendStatusToFrontend(t.status) 
+          }));
+          setTables(formattedTables);
+        }
+      } catch (error) {
+        console.error("초기 테이블 현황 조회 실패:", error);
       }
-
-      const result = await response.json();
-      
-      // [수정] 명세서상 result.data가 아니라 result.data.tables가 배열입니다.
-      if (result.success && result.data && Array.isArray(result.data.tables)) {
-        const formattedTables = result.data.tables.map((t: any) => ({
-          id: t.tableId, 
-          number: t.tableNumber,
-          // [수정] 백엔드 필드명이 t.status가 아니라 t.tableStatus입니다.
-          status: mapBackendStatusToFrontend(t.tableStatus) 
-        }));
-        setTables(formattedTables);
-      }
-    } catch (error) {
-      console.error("초기 테이블 현황 조회 실패:", error);
-    }
-  };
+    };
 
     fetchInitialTables();
 
