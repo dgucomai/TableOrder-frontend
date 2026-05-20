@@ -151,16 +151,23 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
   // [API 연동 1] 테이블 정리/초기화 (PATCH)
   // ==========================================
   const handleResetTable = async () => {
+    // 1. URL에 들어갈 tableId가 유효한지 콘솔로 확인합니다.
+    console.log("초기화 요청 tableId:", tableId); 
+
+    if (!tableId) {
+      alert("테이블 ID를 확인할 수 없습니다.");
+      return;
+    }
+
     try {
       const tokenStr = localStorage.getItem("staffAccessToken") || "";
+      
       const response = await fetch(`/api/staff/tables/${tableId}/clear`, {
         method: "PATCH",
         headers: {
-          "Authorization": `Bearer ${tokenStr}`,
-          "Content-Type": "application/json"
-        },
-        // 백엔드 프레임워크에 따라 JSON Content-Type일 때 바디가 아예 없으면 에러를 낼 수 있으므로 빈 객체 전송
-        body: JSON.stringify({}) 
+          "Authorization": `Bearer ${tokenStr}`
+          // 주의: Content-Type과 body를 아예 제거했습니다!
+        }
       });
 
       if (response.status === 401 || response.status === 403) {
@@ -168,11 +175,11 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
         return;
       }
 
-      // 서버에서 200번대 응답이 오지 않았을 경우의 예외 처리 강화
+      // 2. 여전히 에러가 난다면 서버가 주는 진짜 이유를 알림창과 콘솔에 띄웁니다.
       if (!response.ok) {
         const errorData = await response.json().catch(() => null);
-        console.error("테이블 초기화 실패 응답:", errorData || response.statusText);
-        alert(errorData?.message || `테이블 정리에 실패했습니다. (상태 코드: ${response.status})`);
+        console.error("테이블 초기화 실패 상세 정보:", errorData);
+        alert(`실패 [400]: ${errorData?.message || errorData?.error || "요청 형식이 잘못되었습니다."}`);
         return;
       }
 
