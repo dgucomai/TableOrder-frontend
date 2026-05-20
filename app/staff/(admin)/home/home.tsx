@@ -9,7 +9,8 @@ type BackendTableStatus = "EMPTY" | "IN_USE" | "PAYMENT_PENDING" | "STAFF_CALL" 
 
 // 프론트엔드 테이블 데이터 구조
 interface TableData {
-  id: number;
+  id: number; //API에서 내려주는 고유 테이블 ID
+  number: number; // 테이블 번호 화면표시용
   status: string; // 매핑된 프론트엔드용 상태값 (empty, active, deposit, staff, dealer)
 }
 
@@ -76,10 +77,10 @@ export default function AdminHomePage() {
         }
 
         const result = await response.json();
-        if (Array.isArray(result)) {
-          const formattedTables = result.map((t: any) => ({
-            id: t.tableId, // (참고) 화면에 100, 101 등 tableNumber를 띄우려면 여기를 수정해야 할 수도 있습니다.
-            // 2. t.tableStatus 가 아닌 t.status 로 받아옵니다.
+        // result 자체가 아닌 result.data가 배열인지 확인하도록 수정
+        if (result.success && Array.isArray(result.data)) {
+          const formattedTables = result.data.map((t: any) => ({
+            id: t.tableId, 
             status: mapBackendStatusToFrontend(t.status) 
           }));
           setTables(formattedTables);
