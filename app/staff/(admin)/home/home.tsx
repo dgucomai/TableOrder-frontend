@@ -3,7 +3,6 @@
 import React, { useState, useRef, useEffect } from "react";
 // TableDetailPopup 내부에서 상세 조회(GET /api/staff/tables/{tableId}) API를 호출하도록 구현되어야 합니다.
 import TableDetailPopup from "@/components/TableDetailPopup";
-import { number } from "framer-motion";
 
 // 백엔드 API에서 내려주는 상태 타입 정의
 type BackendTableStatus = "EMPTY" | "IN_USE" | "PAYMENT_PENDING" | "STAFF_CALL" | "DEALER_CALL";
@@ -21,10 +20,6 @@ export default function AdminHomePage() {
   const [isDragging, setIsDragging] = useState(false);
   const [hasMoved, setHasMoved] = useState(false);
   const [selectedTable, setSelectedTable] = useState<number | null>(null);
-  
-  // 테이블 범위 필터 상태
-  const [startTable, setStartTable] = useState<number | "">("");
-  const [endTable, setEndTable] = useState<number | "">("");
   
   const desktopContainerRef = useRef<HTMLDivElement>(null);
   const lastMousePos = useRef({ x: 0, y: 0 });
@@ -97,12 +92,9 @@ export default function AdminHomePage() {
     // ==========================================
     // [API 연동 4] SSE (Server-Sent Events) 연결
     // ==========================================
-    // 주의: EventSource는 기본적으로 Header를 지원하지 않으므로, 
-    // 백엔드 설계에 따라 query 파라미터(?token=)로 토큰을 보내거나
-    // fetch-event-source 라이브러리를 사용해 Header에 Bearer를 넣어야 합니다.
     const eventSource = new EventSource(`/api/staff/sse?token=${token}`);
 
-    // 범용 메시지 수신 (혹은 eventSource.addEventListener('TABLE_STATUS_CHANGED', ...) 방식 사용 가능)
+    // 범용 메시지 수신
     eventSource.onmessage = (event) => {
       try {
         const parsedData = JSON.parse(event.data);
@@ -125,19 +117,16 @@ export default function AdminHomePage() {
       }
     };
 
-    // 에러 발생 시 재동기화를 위해 다시 fetch 하도록 처리할 수 있습니다.
     eventSource.onerror = () => {
       console.warn("SSE 연결이 끊어졌거나 에러가 발생했습니다. 재동기화 시도 중...");
-      // 연결이 닫혔다면 다시 fetchInitialTables()를 호출하는 로직 추가 가능
     };
 
-    // 컴포넌트 언마운트 시 SSE 연결 종료 (단일 연결 유지 정책 준수)
     return () => {
       eventSource.close();
     };
   }, []);
 
-  // --- 기존의 데스크탑 전용 휠/터치 마우스 이벤트 핸들러 (유지) ---
+  // --- 기존의 데스크탑 전용 휠/터치 마우스 이벤트 핸들러 ---
   useEffect(() => {
     const area = desktopContainerRef.current;
     if (!area) return;
@@ -238,19 +227,11 @@ export default function AdminHomePage() {
     setTimeout(() => setIsDragging(false), 0);
   };
 
-  const checkIsFilteredOut = (id: number) => {
-    if (startTable === "" && endTable === "") return false;
-    if (startTable !== "" && id < startTable) return true;
-    if (endTable !== "" && id > endTable) return true;
-    return false;
-  };
-
   return (
     <div className="h-[100dvh] w-full flex flex-col bg-[#020617] overflow-hidden select-none relative font-sans">      
       
-      {/* 모바일 뷰 유지 */}
+      {/* 모바일 뷰 */}
       <div className="flex md:hidden flex-col h-full w-full">
-        {/* 모바일 헤더 로직 생략 (기존과 완벽히 동일) */}
         <div className="sticky top-0 z-40 bg-slate-900/95 backdrop-blur-md border-b border-slate-800 p-4 pb-3 flex flex-col gap-3 shadow-lg">
           <div className="flex gap-3 overflow-x-auto whitespace-nowrap pb-1 [&::-webkit-scrollbar]:hidden">
             {Object.entries(statusConfig).map(([key, config]) => (
@@ -260,50 +241,20 @@ export default function AdminHomePage() {
               </div>
             ))}
           </div>
-
-          <div className="flex items-center gap-2 w-full">
-            <span className="text-slate-300 text-xs font-bold whitespace-nowrap">테이블 검색</span>
-            <div className="flex-1 flex gap-1 items-center bg-slate-800/50 p-1 rounded-lg border border-slate-700/50">
-              <input
-                type="number"
-                value={startTable}
-                onChange={(e) => setStartTable(e.target.value === "" ? "" : Number(e.target.value))}
-                className="w-full bg-transparent text-white px-2 py-1.5 text-sm outline-none text-center"
-                placeholder="시작"
-              />
-              <span className="text-slate-500 text-xs">~</span>
-              <input
-                type="number"
-                value={endTable}
-                onChange={(e) => setEndTable(e.target.value === "" ? "" : Number(e.target.value))}
-                className="w-full bg-transparent text-white px-2 py-1.5 text-sm outline-none text-center"
-                placeholder="끝"
-              />
-            </div>
-            <button
-              onClick={() => { setStartTable(""); setEndTable(""); }}
-              className="px-3 py-2 bg-slate-700 active:bg-slate-600 text-white text-xs font-bold rounded-lg transition-colors whitespace-nowrap"
-            >
-              초기화
-            </button>
-          </div>
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 pb-20">
           <div className="grid grid-cols-4 sm:grid-cols-5 gap-2.5">
             {tables.map((table) => {
-              // 초기 로딩 시 status가 없을 수도 있으므로 fallback 방어 로직 추가
               const config = statusConfig[table.status as keyof typeof statusConfig] || statusConfig.empty;
-              const isFilteredOut = checkIsFilteredOut(table.id);
 
               return (
                 <button
                   key={`mob-tbl-${table.id}`}
                   onClick={() => setSelectedTable(table.id)}
                   className={`
-                    relative aspect-square rounded-xl border-2 flex flex-col items-center justify-center transition-all
+                    relative aspect-square rounded-xl border-2 flex flex-col items-center justify-center transition-all active:scale-90 active:border-white/50
                     ${config.color} 
-                    ${isFilteredOut ? 'opacity-10 pointer-events-none grayscale' : 'active:scale-90 active:border-white/50'}
                   `}
                 >
                   <span className="font-black text-slate-100 text-xl">{table.number}</span>
@@ -315,37 +266,10 @@ export default function AdminHomePage() {
         </div>
       </div>
 
-      {/* 데스크탑 뷰 유지 */}
+      {/* 데스크탑 뷰 */}
       <div className="hidden md:flex flex-1 relative overflow-hidden w-full h-full">
         <div className="absolute bottom-6 left-6 z-30 bg-slate-900/80 backdrop-blur px-4 py-2 rounded-full border border-slate-700 text-[11px] text-slate-400 shadow-lg">
           <span className="text-orange-500 font-bold">Ctrl + 휠</span> 줌 | <span className="text-orange-500 font-bold">드래그</span> 이동
-        </div>
-
-        <div className="absolute top-6 right-6 z-40 bg-slate-900/80 backdrop-blur px-5 py-3 rounded-2xl border border-slate-700 flex items-center gap-3 shadow-xl">
-          <span className="text-slate-300 text-sm font-bold">번호 필터</span>
-          <div className="flex items-center gap-2">
-            <input
-              type="number"
-              value={startTable}
-              onChange={(e) => setStartTable(e.target.value === "" ? "" : Number(e.target.value))}
-              className="w-16 bg-slate-800 text-white px-2 py-1.5 rounded-lg border border-slate-600 text-sm outline-none focus:border-orange-500 text-center"
-              placeholder="시작"
-            />
-            <span className="text-slate-400">~</span>
-            <input
-              type="number"
-              value={endTable}
-              onChange={(e) => setEndTable(e.target.value === "" ? "" : Number(e.target.value))}
-              className="w-16 bg-slate-800 text-white px-2 py-1.5 rounded-lg border border-slate-600 text-sm outline-none focus:border-orange-500 text-center"
-              placeholder="끝"
-            />
-            <button
-              onClick={() => { setStartTable(""); setEndTable(""); }}
-              className="ml-2 px-4 py-1.5 bg-slate-700 hover:bg-slate-600 text-white text-sm font-bold rounded-lg transition-colors"
-            >
-              초기화
-            </button>
-          </div>
         </div>
 
         <div 
@@ -378,16 +302,14 @@ export default function AdminHomePage() {
             <div className="grid grid-cols-10 gap-4 mt-0">
               {tables.map((table) => {
                 const config = statusConfig[table.status as keyof typeof statusConfig] || statusConfig.empty;
-                const isFilteredOut = checkIsFilteredOut(table.id);
 
                 return (
                   <button
                     key={`desk-tbl-${table.id}`}
                     onClick={() => !hasMoved && setSelectedTable(table.id)}
                     className={`
-                      relative h-24 rounded-2xl border-2 flex flex-col items-center justify-center transition-all duration-200
+                      relative h-24 rounded-2xl border-2 flex flex-col items-center justify-center transition-all duration-200 hover:border-white/40 hover:scale-105 hover:shadow-lg active:scale-95
                       ${config.color} text-2xl
-                      ${isFilteredOut ? 'opacity-10 pointer-events-none grayscale scale-95' : 'hover:border-white/40 hover:scale-105 hover:shadow-lg active:scale-95'}
                     `}
                   >
                     <span className="font-black text-slate-100">{table.number}</span>
@@ -400,10 +322,7 @@ export default function AdminHomePage() {
         </div>
       </div>
 
-      {/* [API 연동 5] 액션 처리 (주문 승인, 호출 해결, 테이블 정리) 
-        이 부분은 테이블 클릭 시 열리는 TableDetailPopup 컴포넌트 내부에서 
-        명세서의 PATCH, DELETE API들을 호출하도록 구현되어야 합니다.
-      */}
+      {/* 액션 처리 팝업 */}
       {selectedTable && (
         <TableDetailPopup 
           tableId={selectedTable} 
