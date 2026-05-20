@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect } from "react";
 // TableDetailPopup 내부에서 상세 조회(GET /api/staff/tables/{tableId}) API를 호출하도록 구현되어야 합니다.
 import TableDetailPopup from "@/components/TableDetailPopup";
+import { number } from "framer-motion";
 
 // 백엔드 API에서 내려주는 상태 타입 정의
 type BackendTableStatus = "EMPTY" | "IN_USE" | "PAYMENT_PENDING" | "STAFF_CALL" | "DEALER_CALL";
@@ -81,6 +82,7 @@ export default function AdminHomePage() {
         if (result.success && Array.isArray(result.data)) {
           const formattedTables = result.data.map((t: any) => ({
             id: t.tableId, 
+            number: t.tableNumber,
             status: mapBackendStatusToFrontend(t.status) 
           }));
           setTables(formattedTables);
@@ -388,7 +390,7 @@ export default function AdminHomePage() {
                       ${isFilteredOut ? 'opacity-10 pointer-events-none grayscale scale-95' : 'hover:border-white/40 hover:scale-105 hover:shadow-lg active:scale-95'}
                     `}
                   >
-                    <span className="font-black text-slate-100">{table.id}</span>
+                    <span className="font-black text-slate-100">{table.number}</span>
                     {config.icon && <span className="absolute top-2 right-2 text-sm drop-shadow-md">{config.icon}</span>}
                   </button>
                 );
