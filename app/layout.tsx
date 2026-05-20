@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: {
     template: "CAISINO | %s", // 하위 페이지 제목이 %s 자리에 들어갑니다.
-    default: "테이블오더 서비스", // 하위 페이지에 제목이 없을 때 사용할 기본값
+    default: "CAISINO", // 하위 페이지에 제목이 없을 때 사용할 기본값
   },
   description: "동국대학교 컴퓨터AI학부 주점 CAISINO",
 };
