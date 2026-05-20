@@ -13,7 +13,7 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
   const pathname = usePathname();
 
   const navLinks = [
-    { href: "/staff/home", label: "홈 (포스)" },
+    { href: "/staff/home", label: "홈" },
     { href: "/staff/menu", label: "메뉴" },
     { href: "/staff/calls", label: "호출" },
     { href: "/staff/log", label: "기록" },
