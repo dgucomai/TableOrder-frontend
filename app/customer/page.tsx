@@ -43,7 +43,8 @@ export default function OrderPage() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
   
-  const [step, setStep] = useState<'MENU' | 'PAYMENT' | 'CALL_SENT'>('MENU');
+  // 🔄 검증 단계를 위해 'LOADING' 및 'ACCESS_DENIED' 추가
+  const [step, setStep] = useState<'LOADING' | 'MENU' | 'PAYMENT' | 'CALL_SENT' | 'ACCESS_DENIED'>('LOADING');
   const [isLoading, setIsLoading] = useState(false);
 
   // 🔔 직원 호출 관련 상태
@@ -54,44 +55,45 @@ export default function OrderPage() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    // qrToken 또는 qt 파라미터 모두 대응
     const token = params.get("qt") || params.get("qrToken");
-    const tableNum = params.get("table");
     
-    setQrToken(token || "test_token_123");
+    // 토큰이 아예 없다면 즉시 접근 거부
+    if (!token) {
+      setStep('ACCESS_DENIED');
+      return;
+    }
+    
+    setQrToken(token);
 
-    // --- [GET] 테이블 번호 조회 API ---
-    const fetchTableInfo = async (qt: string) => {
+    // --- [GET] 테이블 번호 필수 검증 API ---
+    const verifyTableAndFetchMenus = async (qt: string) => {
       try {
         const response = await fetch(`${API_BASE_URL}/qtnum?qt=${qt}`);
         
         if (!response.ok) {
-          throw new Error('테이블 정보 네트워크 응답이 정상이 아닙니다.');
+          throw new Error('테이블 정보 조회 실패');
         }
 
         const result = await response.json();
 
-        if (result.success && result.data) {
-          // API에서 성공적으로 받아온 tableNumber로 상태 업데이트
+        // 성공하고 유효한 tableNumber 값이 있을 때만 통과
+        if (result.success && result.data && result.data.tableNumber) {
           setDisplayTableNum(result.data.tableNumber.toString());
+          
+          // 테이블 정보가 정상 확인된 후에만 메뉴 목록 조회
+          await fetchMenus();
+          setStep('MENU'); 
         } else {
-          console.error("테이블 정보 조회 실패:", result.message);
-          setDisplayTableNum(tableNum || "3"); // 실패 시 기존 파라미터나 기본값으로 폴백
+          console.error("테이블 정보 불일치:", result.message);
+          setStep('ACCESS_DENIED');
         }
       } catch (error) {
-        console.error("테이블 번호 API 연동 에러:", error);
-        setDisplayTableNum(tableNum || "3");
+        console.error("테이블 검증 API 에러:", error);
+        setStep('ACCESS_DENIED');
       }
     };
 
-    if (token) {
-      fetchTableInfo(token);
-    } else {
-      setDisplayTableNum(tableNum || "3");
-    }
-
-    // 컴포넌트 마운트 시 전체 메뉴 조회 API 호출
-    fetchMenus();
+    verifyTableAndFetchMenus(token);
   }, []);
 
   // --- 1. [GET] 전체 메뉴 조회 API ---
@@ -107,7 +109,6 @@ export default function OrderPage() {
 
       if (result.success) {
         const fetchedMenus = result.data.menus;
-        
         setMenuList(fetchedMenus);
         
         // 동적 카테고리 탭 생성
@@ -247,6 +248,28 @@ export default function OrderPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 pb-28 relative">
+      {/* 🔄 로딩 화면 */}
+      {step === 'LOADING' && (
+        <div className="fixed inset-0 bg-white flex flex-col items-center justify-center p-8 z-50">
+          <div className="w-10 h-10 border-4 border-orange-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+          <p className="text-gray-500 font-bold text-sm">테이블 정보를 확인하고 있습니다...</p>
+        </div>
+      )}
+
+      {/* 🚫 접근 거부 화면 */}
+      {step === 'ACCESS_DENIED' && (
+        <div className="fixed inset-0 bg-white flex flex-col items-center justify-center p-8 z-50">
+          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-6">
+            <X className="text-red-600" size={32} />
+          </div>
+          <h2 className="text-2xl font-black text-gray-900 mb-2 text-center">접근이 거부되었습니다</h2>
+          <p className="text-gray-500 text-center mb-8 text-sm leading-relaxed">
+            유효하지 않은 QR 코드이거나 테이블 정보가 확인되지 않습니다.<br />
+            매장 직원에게 문의하거나 QR 코드를 다시 스캔해주세요.
+          </p>
+        </div>
+      )}
+
       {/* 1. MENU 단계 */}
       {step === 'MENU' && (
         <>
@@ -254,8 +277,8 @@ export default function OrderPage() {
             <header className="px-4 py-3 flex justify-between items-center shadow-sm">
               <div>
                 <h1 className="text-lg font-extrabold text-orange-600 tracking-tight">CAISINO ORDER</h1>
-                <p className={`text-xs font-bold ${qrToken ? "text-gray-700" : "text-red-500"}`}>
-                  {displayTableNum ? `${displayTableNum}번 테이블` : (qrToken ? "테이블 확인 중..." : "잘못된 접근")}
+                <p className="text-xs font-bold text-gray-700">
+                  {displayTableNum}번 테이블
                 </p>
               </div>
               <div className="flex items-center gap-1">

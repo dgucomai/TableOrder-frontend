@@ -73,7 +73,7 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
 
           {/* 로고 링크 */}
           <Link href="/staff/home" replace={pathname !== '/staff/home'} className="text-xl font-black text-orange-500 tracking-tighter hover:opacity-80 transition-opacity">
-            CAISINO
+            CAISINO STAFF
           </Link>
           
           {/* 데스크탑 네비게이션 메뉴 */}
