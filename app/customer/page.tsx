@@ -54,11 +54,41 @@ export default function OrderPage() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const token = params.get("qrToken");
+    // qrToken 또는 qt 파라미터 모두 대응
+    const token = params.get("qt") || params.get("qrToken");
     const tableNum = params.get("table");
     
     setQrToken(token || "test_token_123");
-    setDisplayTableNum(tableNum || "3"); 
+
+    // --- [GET] 테이블 번호 조회 API ---
+    const fetchTableInfo = async (qt: string) => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/qtnum?qt=${qt}`);
+        
+        if (!response.ok) {
+          throw new Error('테이블 정보 네트워크 응답이 정상이 아닙니다.');
+        }
+
+        const result = await response.json();
+
+        if (result.success && result.data) {
+          // API에서 성공적으로 받아온 tableNumber로 상태 업데이트
+          setDisplayTableNum(result.data.tableNumber.toString());
+        } else {
+          console.error("테이블 정보 조회 실패:", result.message);
+          setDisplayTableNum(tableNum || "3"); // 실패 시 기존 파라미터나 기본값으로 폴백
+        }
+      } catch (error) {
+        console.error("테이블 번호 API 연동 에러:", error);
+        setDisplayTableNum(tableNum || "3");
+      }
+    };
+
+    if (token) {
+      fetchTableInfo(token);
+    } else {
+      setDisplayTableNum(tableNum || "3");
+    }
 
     // 컴포넌트 마운트 시 전체 메뉴 조회 API 호출
     fetchMenus();
@@ -97,7 +127,7 @@ export default function OrderPage() {
     ? menuList 
     : menuList.filter(item => item.categoryName === activeCategory);
   
-  // 장바구니 담기 (중복 menuId는 프론트에서 수량만 합산 처리 - 명세서 규칙 준수)
+  // 장바구니 담기
   const addToCart = (item: MenuItem) => {
     if (item.soldOut) return;
     setCart(prev => {
@@ -141,13 +171,12 @@ export default function OrderPage() {
     }
   };
 
-  // --- 2. [POST] 장바구니 주문 대기 등록 API (입금 확인 요청 통합) ---
+  // --- 2. [POST] 장바구니 주문 대기 등록 API ---
   const submitOrder = async () => {
     if (!qrToken || cart.length === 0) return;
     setIsLoading(true);
 
     try {
-      // 명세서에 맞게 qrToken과 items(menuId, quantity)만 전송
       const payload = {
         qrToken: qrToken,
         items: cart.map(item => ({ menuId: item.menuId, quantity: item.quantity }))
@@ -163,7 +192,7 @@ export default function OrderPage() {
 
       if (result.success) {
         setStep('CALL_SENT');
-        setCart([]); // 주문 완료 후 장바구니 초기화
+        setCart([]);
       } else {
         alert(result.message || "주문 처리 중 오류가 발생했습니다.");
       }
@@ -221,30 +250,26 @@ export default function OrderPage() {
       {/* 1. MENU 단계 */}
       {step === 'MENU' && (
         <>
-          {/* [수정 1] 헤더와 카테고리를 감싸는 완벽한 고정(Sticky) 래퍼 */}
-          {/* z-index를 30으로 올리고, 완벽한 불투명 배경(bg-white)을 적용해 하단 요소가 절대 비치지 않게 합니다. */}
           <div className="sticky top-0 z-30 flex flex-col bg-white">
             <header className="px-4 py-3 flex justify-between items-center shadow-sm">
               <div>
                 <h1 className="text-lg font-extrabold text-orange-600 tracking-tight">CAISINO ORDER</h1>
                 <p className={`text-xs font-bold ${qrToken ? "text-gray-700" : "text-red-500"}`}>
-                  {displayTableNum ? `${displayTableNum}번 테이블` : (qrToken ? "테이블 확인 완료" : "잘못된 접근")}
+                  {displayTableNum ? `${displayTableNum}번 테이블` : (qrToken ? "테이블 확인 중..." : "잘못된 접근")}
                 </p>
               </div>
               <div className="flex items-center gap-1">
-                {/* 직원 호출 버튼 */}
                 <button onClick={() => setIsCallModalOpen(true)} className="p-2 text-orange-600 hover:bg-orange-50 rounded-full transition-colors flex flex-col items-center justify-center">
                   <BellRing className="w-6 h-6" />
-                  <span className="text-[10px] font-bold mt-0.5">직원</span>
+                  <span className="text-[10px] font-bold mt-0.5">호출</span>
                 </button>
                 <Link href="/customer/orders" className="p-2 text-gray-700 hover:bg-gray-100 rounded-full transition-colors">
                   <ReceiptText className="w-6 h-6" />
-                  <span className="text-[10px] font-bold mt-0.5">기록</span>
+                  <span className="text-[10px] font-bold mt-0.5"> 내역</span>
                 </Link>
               </div>
             </header>
 
-            {/* 카테고리 탭 (기존 sticky 제거됨) */}
             <div className="flex gap-2 overflow-x-auto px-4 py-3 border-b border-gray-100 scrollbar-hide">
               {categories.map(cat => (
                 <button 
@@ -265,7 +290,6 @@ export default function OrderPage() {
               </div>
             ) : (
               <>
-                {/* 메뉴 리스트 렌더링 */}
                 {filteredMenu.map(item => {
                   const cartItem = cart.find(i => i.menuId === item.menuId);
                   return (
@@ -450,7 +474,6 @@ export default function OrderPage() {
                 ))}
               </div>
 
-               {/* 공백 없는 "기타(직접 입력)" 으로 정확히 조건 매칭 */}
               {selectedCall === "기타(직접 입력)" && (
                 <div className="mt-4 animate-in fade-in zoom-in-95 duration-200">
                   <input
