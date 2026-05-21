@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { X, Coins, Clock, Check, AlertTriangle, Timer, CreditCard, RotateCcw, Trash2 } from "lucide-react";
+import { X, Coins, Clock, Check, AlertTriangle, Timer, CreditCard, RotateCcw, Trash2, MessageSquare } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 interface Order {
@@ -18,6 +18,7 @@ interface CallInfo {
   id: string;
   type: "직원 호출" | "딜러 호출" | "입금 확인";
   time: string;
+  message?: string;
 }
 
 export default function TableDetailPopup({ tableId, onClose }: { tableId: number; onClose: () => void }) {
@@ -25,7 +26,7 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
   const [tokens, setTokens] = useState(0);
   const [isEditTokenOpen, setIsEditTokenOpen] = useState(false);
   const [isResetOpen, setIsResetOpen] = useState(false);
-  const [tokenDelta, setTokenDelta] = useState<string>(""); // 증감값 입력 상태
+  const [tokenDelta, setTokenDelta] = useState<string>(""); 
 
   const [totalAmount, setTotalAmount] = useState(0);
   const [startedAt, setStartedAt] = useState<string | null>(null);
@@ -47,7 +48,8 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
   const mapOrderStatus = (backendStatus: string) => {
     switch (backendStatus) {
       case "PAYMENT_PENDING": return "입금 확인 대기";
-      case "PREPARING": return "준비 중";
+      case "PREPARING": 
+      case "COOKING": return "준비 중";
       case "COMPLETED": return "제공 완료";
       default: return "준비 중";
     }
@@ -58,7 +60,6 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
     return () => clearInterval(timer);
   }, []);
 
-  // --- 기존 테이블 상세 정보 조회 API (GET) ---
   useEffect(() => {
     const fetchTableDetail = async () => {
       try {
@@ -86,7 +87,12 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
           if (tableData.calls && Array.isArray(tableData.calls)) {
             tableData.calls.forEach((c: any) => {
               if (c.status === "REQUESTED") { 
-                mappedCalls.push({ id: `call-${c.callId}`, type: c.callType === "DEALER" ? "딜러 호출" : "직원 호출", time: formatTime(c.createdAt) });
+                mappedCalls.push({ 
+                  id: `call-${c.callId}`, 
+                  type: c.callType === "DEALER" ? "딜러 호출" : "직원 호출", 
+                  time: formatTime(c.createdAt),
+                  message: c.message || ""
+                });
               }
             });
           }
@@ -147,13 +153,8 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
   const handleDeleteGroupClick = (time: string) => { setIsEditTokenOpen(false); setIsResetOpen(false); setTimeToDelete(time); setDeleteReason(""); setIsDeleteOrderOpen(true); };
   const executeDeleteGroup = () => { if (!timeToDelete) return; setOrders(prev => prev.filter(order => order.time !== timeToDelete)); setIsDeleteOrderOpen(false); setTimeToDelete(null); setDeleteReason(""); };
 
-  // ==========================================
-  // [API 연동 1] 테이블 정리/초기화 (PATCH)
-  // ==========================================
   const handleResetTable = async () => {
-    // 1. URL에 들어갈 tableId가 유효한지 콘솔로 확인합니다.
     console.log("초기화 요청 tableId:", tableId); 
-
     if (!tableId) {
       alert("테이블 ID를 확인할 수 없습니다.");
       return;
@@ -161,12 +162,10 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
 
     try {
       const tokenStr = localStorage.getItem("staffAccessToken") || "";
-      
       const response = await fetch(`/api/staff/tables/${tableId}/clear`, {
         method: "PATCH",
         headers: {
           "Authorization": `Bearer ${tokenStr}`
-          // 주의: Content-Type과 body를 아예 제거했습니다!
         }
       });
 
@@ -175,7 +174,6 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
         return;
       }
 
-      // 2. 여전히 에러가 난다면 서버가 주는 진짜 이유를 알림창과 콘솔에 띄웁니다.
       if (!response.ok) {
         const errorData = await response.json().catch(() => null);
         console.error("테이블 초기화 실패 상세 정보:", errorData);
@@ -184,10 +182,9 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
       }
 
       const result = await response.json();
-      
       if (result.success) {
         alert("테이블 정리가 완료되었습니다.");
-        onClose(); // 팝업 닫기
+        onClose(); 
       } else {
         alert(result.message || "테이블 정리에 실패했습니다.");
       }
@@ -197,9 +194,6 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
     }
   };
 
-  // ==========================================
-  // [API 연동 2] 토큰 수량 증감 수정 (PATCH)
-  // ==========================================
   const handleUpdateTokens = async () => {
     const deltaValue = Number(tokenDelta);
     if (isNaN(deltaValue) || deltaValue === 0) return;
@@ -222,7 +216,6 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
 
       const result = await response.json();
       
-      // 통신 성공 시 (별도 응답 포맷이 없다면 status ok 기준)
       if (response.ok || result.success) {
         setTokens((prev) => prev + deltaValue);
         setIsEditTokenOpen(false);
@@ -234,6 +227,13 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
       console.error("토큰 수정 API 호출 오류:", error);
       alert("오류가 발생했습니다.");
     }
+  };
+
+  const adjustToken = (amount: number) => {
+    setTokenDelta(prev => {
+      const current = Number(prev) || 0;
+      return (current + amount).toString();
+    });
   };
 
   const getCallStyle = (type: string) => {
@@ -260,12 +260,19 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
               <h2 className="text-4xl sm:text-6xl font-black text-orange-500 italic tracking-tighter">
                 {tableNumber !== null ? tableNumber : tableId}
               </h2>
-              <div className="flex items-center gap-4 sm:gap-10 border-l border-white/10 pl-4 sm:pl-10">
+              <div className="flex items-center gap-4 sm:gap-8 border-l border-white/10 pl-4 sm:pl-10">
                 <div className="flex flex-col">
                   <span className="text-[10px] sm:text-[12px] text-slate-500 font-bold uppercase tracking-widest">총 금액</span>
                   <span className="text-lg sm:text-3xl font-black text-white">{totalAmount.toLocaleString()}원</span>
                 </div>
-                <div className="flex flex-col border-l border-white/5 pl-4 sm:pl-10">
+                {/* 2. 총 금액과 이용시간 사이에 보유 토큰 수량 추가 */}
+                <div className="flex flex-col border-l border-white/5 pl-4 sm:pl-8">
+                  <span className="text-[10px] sm:text-[12px] text-yellow-500/80 font-bold uppercase tracking-widest flex items-center gap-1">
+                    <Coins size={10} /> 보유 토큰
+                  </span>
+                  <span className="text-lg sm:text-3xl font-black text-yellow-500">{tokens} T</span>
+                </div>
+                <div className="flex flex-col border-l border-white/5 pl-4 sm:pl-8">
                   <span className="text-[10px] sm:text-[12px] text-cyan-600 font-bold uppercase tracking-widest flex items-center gap-1">
                     <Timer size={10} /> 이용 시간
                   </span>
@@ -283,11 +290,20 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
                 {activeCalls.slice(0, 3).map((call) => (
                   <motion.div key={call.id} layout initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, x: -20 }} 
                     className={`p-4 rounded-2xl border flex flex-col justify-between transition-colors ${getCallStyle(call.type)}`}>
-                    <div className="flex justify-between items-center">
-                      <span className="text-lg font-black">{call.type}</span>
-                      <span className="opacity-70 font-mono text-xs">{call.time}</span>
+                    <div className="flex flex-col mb-3">
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="text-lg font-black">{call.type}</span>
+                        <span className="opacity-70 font-mono text-xs">{call.time}</span>
+                      </div>
+                      {/* 1. 직원 호출의 내용 표시 기능 */}
+                      {call.message && (
+                        <div className="flex items-start gap-2 mt-2 p-2.5 bg-black/20 rounded-xl border border-white/5 text-sm font-medium break-keep">
+                          <MessageSquare size={14} className="mt-0.5 opacity-70 shrink-0" />
+                          <span className="opacity-90">{call.message}</span>
+                        </div>
+                      )}
                     </div>
-                    <button onClick={() => handleAcceptCall(call.id)} className="mt-3 w-full bg-white/10 hover:bg-white/20 text-white py-2.5 rounded-lg font-bold text-xs flex items-center justify-center gap-2 border border-white/10 active:scale-95">
+                    <button onClick={() => handleAcceptCall(call.id)} className="w-full bg-white/10 hover:bg-white/20 py-2.5 rounded-lg font-bold text-xs flex items-center justify-center gap-2 border border-white/10 active:scale-95 transition-all">
                       <Check size={16} strokeWidth={3} /> <span>호출 수락</span>
                     </button>
                   </motion.div>
@@ -339,6 +355,21 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
                         </div>
                       ))}
                     </div>
+
+                    {/* 4. PAYMENT_PENDING 상태 그룹 맨 아래에 총 금액 따로 표기 */}
+                    {isWaitingDeposit && (
+                      <div className="mt-4 pt-4 border-t border-dashed border-emerald-500/20 flex justify-between items-center bg-emerald-500/5 p-4 rounded-xl">
+                        <span className="text-sm font-bold text-emerald-500/80">입금 확인 대기 총액</span>
+                        <span className="text-xl font-black text-emerald-400">
+                          {groupedOrders[time]
+                            .filter((o: Order) => o.status === "입금 확인 대기")
+                            .reduce((sum: number, o: Order) => sum + (o.price * o.quantity), 0)
+                            .toLocaleString()
+                          }원
+                        </span>
+                      </div>
+                    )}
+
                   </div>
                 );
               })}
@@ -346,10 +377,10 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
           </div>
           
           <div className="p-4 sm:p-8 bg-slate-900/40 border-t border-white/5 flex flex-col sm:flex-row gap-3">
-            <button onClick={() => { setIsResetOpen(false); setIsDeleteOrderOpen(false); setIsEditTokenOpen(!isEditTokenOpen); setTokenDelta(""); }} className="flex-1 bg-slate-700 hover:bg-slate-600 text-white py-4 sm:py-6 rounded-2xl font-black text-lg sm:text-xl flex items-center justify-center gap-3 active:scale-95">
+            <button onClick={() => { setIsResetOpen(false); setIsDeleteOrderOpen(false); setIsEditTokenOpen(!isEditTokenOpen); setTokenDelta(""); }} className="flex-1 bg-slate-700 hover:bg-slate-600 text-white py-4 sm:py-6 rounded-2xl font-black text-lg sm:text-xl flex items-center justify-center gap-3 active:scale-95 transition-all">
               <Coins size={20} className="text-yellow-500" /> 토큰 수량 증감
             </button>
-            <button onClick={() => { setIsEditTokenOpen(false); setIsDeleteOrderOpen(false); setIsResetOpen(!isResetOpen); }} className="flex-1 bg-orange-600 hover:bg-orange-500 text-white py-4 sm:py-6 rounded-2xl font-black text-lg sm:text-xl flex items-center justify-center gap-3 active:scale-95">
+            <button onClick={() => { setIsEditTokenOpen(false); setIsDeleteOrderOpen(false); setIsResetOpen(!isResetOpen); }} className="flex-1 bg-orange-600 hover:bg-orange-500 text-white py-4 sm:py-6 rounded-2xl font-black text-lg sm:text-xl flex items-center justify-center gap-3 active:scale-95 transition-all">
               <RotateCcw size={20} /> 테이블 초기화
             </button>
           </div>
@@ -376,13 +407,22 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
                     <label className="text-[12px] text-slate-500 font-bold block mb-2 uppercase tracking-widest">증감할 수량 (Delta)</label>
                     <input 
                       type="number" 
-                      placeholder="예: 2 (추가), -1 (차감)" 
+                      placeholder="예: 2, -1" 
                       value={tokenDelta} 
                       onChange={(e) => setTokenDelta(e.target.value)} 
                       className="w-full bg-[#0f172a] border border-white/10 rounded-xl p-4 text-2xl font-black text-center outline-none focus:ring-1 focus:ring-yellow-500 text-yellow-500" 
                     />
+                    
+                    {/* 3. + - 버튼을 통한 증감 편의성 추가 */}
+                    <div className="flex gap-2 mt-3">
+                      <button onClick={() => adjustToken(-10)} className="flex-1 bg-white/5 hover:bg-white/10 py-2 rounded-lg font-bold text-slate-400 transition-colors">-10</button>
+                      <button onClick={() => adjustToken(-1)} className="flex-1 bg-white/5 hover:bg-white/10 py-2 rounded-lg font-bold text-slate-400 transition-colors">-1</button>
+                      <button onClick={() => adjustToken(1)} className="flex-1 bg-white/5 hover:bg-white/10 py-2 rounded-lg font-bold text-slate-400 transition-colors">+1</button>
+                      <button onClick={() => adjustToken(10)} className="flex-1 bg-white/5 hover:bg-white/10 py-2 rounded-lg font-bold text-slate-400 transition-colors">+10</button>
+                    </div>
+
                     {tokenDelta && !isNaN(Number(tokenDelta)) && (
-                      <p className="mt-4 text-center text-sm font-bold text-slate-400">
+                      <p className="mt-6 text-center text-sm font-bold text-slate-400">
                         수정 후 예상 토큰: <span className="text-white">{tokens + Number(tokenDelta)} T</span>
                       </p>
                     )}
@@ -407,8 +447,8 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
                 <h3 className="text-2xl font-black text-white uppercase tracking-tighter">테이블 초기화</h3>
                 <p className="text-sm text-slate-400 text-center">현재 테이블의 세션을 종료하고 새 테이블 세션으로 초기화합니다.</p>
                 <div className="w-full space-y-4">
-                  <button onClick={handleResetTable} className="w-full bg-orange-600 hover:bg-orange-500 text-white py-5 rounded-2xl font-black text-xl shadow-xl shadow-orange-900/20">초기화 하기</button>
-                  <button onClick={() => setIsResetOpen(false)} className="w-full bg-slate-700 text-slate-300 py-4 rounded-2xl font-bold">취소</button>
+                  <button onClick={handleResetTable} className="w-full bg-orange-600 hover:bg-orange-500 text-white py-5 rounded-2xl font-black text-xl shadow-xl shadow-orange-900/20 transition-all">초기화 하기</button>
+                  <button onClick={() => setIsResetOpen(false)} className="w-full bg-slate-700 text-slate-300 hover:bg-slate-600 py-4 rounded-2xl font-bold transition-all">취소</button>
                 </div>
               </div>
             </motion.div>
@@ -439,7 +479,7 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
                   <button disabled={!deleteReason.trim()} onClick={executeDeleteGroup}
                     className={`w-full py-5 rounded-xl font-black text-lg text-white transition-all active:scale-95 ${!deleteReason.trim() ? "bg-slate-700 cursor-not-allowed opacity-50" : "bg-red-600 hover:bg-red-500 shadow-xl shadow-red-900/20"}`}
                   >전체 취소하기</button>
-                  <button onClick={() => setIsDeleteOrderOpen(false)} className="w-full bg-slate-700 text-slate-300 py-4 rounded-xl font-bold">돌아가기</button>
+                  <button onClick={() => setIsDeleteOrderOpen(false)} className="w-full bg-slate-700 text-slate-300 hover:bg-slate-600 py-4 rounded-xl font-bold transition-all">돌아가기</button>
                 </div>
               </div>
             </motion.div>
