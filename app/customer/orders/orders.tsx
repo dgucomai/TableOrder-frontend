@@ -4,7 +4,6 @@ import React, { useEffect, useState } from 'react';
 import { ChevronLeft, CheckCircle2, Clock, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 
-// [수정: 상태값을 엄격하게 제한하지 않고 string으로 열어둬서 API의 모든 값을 수용하도록 변경]
 type OrderStatus = string;
 
 interface OrderItem {
@@ -21,6 +20,7 @@ interface OrderInfo {
   accountInfo?: string;
 }
 
+// ISO 타임스탬프를 YYYY.MM.DD HH:mm 형태로 변환
 const formatDateTime = (isoString: string) => {
   if (!isoString) return '';
   const date = new Date(isoString);
@@ -33,12 +33,12 @@ const formatDateTime = (isoString: string) => {
   return `${yyyy}.${mm}.${dd} ${hh}:${min}`;
 };
 
+// 정확한 상태값 매핑을 위한 설정 함수
 const getStatusConfig = (status: OrderStatus) => {
-  // [수정: 혹시 모를 공백이나 대소문자 문제 방지를 위해 대문자로 변환 및 공백 제거]
-  const normalizedStatus = status ? String(status).trim().toUpperCase() : 'UNDEFINED';
+  // 공백 제거나 대소문자 불일치로 인한 버그 원천 차단
+  const normalizedStatus = status ? String(status).trim().toUpperCase() : 'UNKNOWN';
 
   switch (normalizedStatus) {
-    case 'PENDING':
     case 'PAYMENT_PENDING':
       return { 
         text: "입금 확인 대기 중", 
@@ -47,19 +47,25 @@ const getStatusConfig = (status: OrderStatus) => {
         bg: "bg-red-50", 
         icon: <AlertCircle size={16} /> 
       };
-    case 'PREPARING':
     case 'COOKING':
-      return { text: "준비 중", color: "text-orange-500", bg: "bg-orange-50", icon: <Clock size={16} /> };
-    case 'COMPLETED':
-    case 'SERVED':
-    case 'DONE':
-      return { text: "제공 완료", color: "text-green-500", bg: "bg-green-100", icon: <CheckCircle2 size={16} /> };
-    default:
-      // [디버깅 핵심] 정의되지 않은 값이면 화면에 눈에 띄게 직접 출력해서 서버 응답값을 확인
       return { 
-        text: `상태 누락: ${normalizedStatus}`, 
-        color: "text-white", 
-        bg: "bg-gray-800", 
+        text: "조리 중", 
+        color: "text-orange-500", 
+        bg: "bg-orange-50", 
+        icon: <Clock size={16} /> 
+      };
+    case 'COMPLETED':
+      return { 
+        text: "제공 완료", 
+        color: "text-green-500", 
+        bg: "bg-green-100", 
+        icon: <CheckCircle2 size={16} /> 
+      };
+    default:
+      return { 
+        text: `상태 확인 불가 (${normalizedStatus})`, 
+        color: "text-gray-500", 
+        bg: "bg-gray-100", 
         icon: <AlertCircle size={16} /> 
       };
   }
@@ -74,6 +80,7 @@ export default function OrderHistoryPage() {
     const fetchOrders = async () => {
       try {
         setIsLoading(true);
+        // API 요청
         const response = await fetch('https://donggukcomai.shop/api/billing?qt=Nrhuz54L');
         
         if (!response.ok) {
@@ -82,25 +89,32 @@ export default function OrderHistoryPage() {
 
         const json = await response.json();
 
-        if (json.success && json.data?.orders) {
+        // success 플래그 확인 및 데이터 존재 여부 검증
+        if (json.success && json.data && Array.isArray(json.data.orders)) {
           const mappedOrders: OrderInfo[] = json.data.orders.map((order: any) => {
-            // 방어적 코드: items가 비어있을 경우 에러 방지
+            // 총 결제 금액 연산 (개별 아이템 subtotal 누적)
             const totalPrice = order.items?.reduce((sum: number, item: any) => sum + item.subtotal, 0) || 0;
 
             return {
               orderId: `ORD-${order.orderId}`,
               date: formatDateTime(order.createdAt),
               items: order.items?.map((item: any) => ({
-                name: `메뉴 ID: ${item.orderItemId}`,
+                name: `메뉴 ID: ${item.orderItemId}`, // API 응답에 이름이 없으므로 ID로 렌더링
                 quantity: item.quantity
               })) || [],
               totalPrice,
-              status: order.orderStatus, // 변환 없이 원본 그대로 전달
+              status: order.orderStatus,
+              // 상태가 PAYMENT_PENDING일 때만 계좌 정보 삽입
               accountInfo: order.orderStatus === 'PAYMENT_PENDING' ? "IBK기업은행 98215102201013 (손승현)" : undefined
             };
           });
 
+          // 주문 번호 기준 내림차순(최신순) 정렬이 필요하다면 아래 주석 해제
+          // mappedOrders.sort((a, b) => b.orderId.localeCompare(a.orderId));
+          
           setOrders(mappedOrders);
+        } else {
+          throw new Error('데이터 형식이 올바르지 않습니다.');
         }
       } catch (err: any) {
         setError(err.message || '알 수 없는 오류가 발생했습니다.');
@@ -162,7 +176,8 @@ export default function OrderHistoryPage() {
                 </div>
               </div>
 
-              {(order.status === 'PENDING' || order.status === 'PAYMENT_PENDING') && order.accountInfo && (
+              {/* 입금 대기 상태 계좌정보 노출 영역 */}
+              {order.status === 'PAYMENT_PENDING' && order.accountInfo && (
                 <div className="bg-red-50 p-4 border-t border-red-100 flex flex-col gap-3">
                   <p className="text-xs text-red-600">
                     아직 입금하지 않았다면 입금을 완료해주세요.
