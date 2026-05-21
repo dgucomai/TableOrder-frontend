@@ -4,8 +4,8 @@ import React, { useEffect, useState } from 'react';
 import { ChevronLeft, CheckCircle2, Clock, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 
-// [수정됨: API 응답에 맞춰 'COOKING' 상태 추가]
-type OrderStatus = 'PENDING' | 'PAYMENT_PENDING' | 'PREPARING' | 'COOKING' | 'COMPLETED';
+// [수정: 상태값을 엄격하게 제한하지 않고 string으로 열어둬서 API의 모든 값을 수용하도록 변경]
+type OrderStatus = string;
 
 interface OrderItem {
   name: string;
@@ -22,6 +22,7 @@ interface OrderInfo {
 }
 
 const formatDateTime = (isoString: string) => {
+  if (!isoString) return '';
   const date = new Date(isoString);
   const yyyy = date.getFullYear();
   const mm = String(date.getMonth() + 1).padStart(2, '0');
@@ -33,7 +34,10 @@ const formatDateTime = (isoString: string) => {
 };
 
 const getStatusConfig = (status: OrderStatus) => {
-  switch (status) {
+  // [수정: 혹시 모를 공백이나 대소문자 문제 방지를 위해 대문자로 변환 및 공백 제거]
+  const normalizedStatus = status ? String(status).trim().toUpperCase() : 'UNDEFINED';
+
+  switch (normalizedStatus) {
     case 'PENDING':
     case 'PAYMENT_PENDING':
       return { 
@@ -44,12 +48,20 @@ const getStatusConfig = (status: OrderStatus) => {
         icon: <AlertCircle size={16} /> 
       };
     case 'PREPARING':
-    case 'COOKING': // [수정됨: COOKING 상태일 때도 '준비 중' UI 반환]
+    case 'COOKING':
       return { text: "준비 중", color: "text-orange-500", bg: "bg-orange-50", icon: <Clock size={16} /> };
     case 'COMPLETED':
+    case 'SERVED':
+    case 'DONE':
       return { text: "제공 완료", color: "text-green-500", bg: "bg-green-100", icon: <CheckCircle2 size={16} /> };
     default:
-      return { text: "확인 불가", color: "text-gray-500", bg: "bg-gray-100", icon: null };
+      // [디버깅 핵심] 정의되지 않은 값이면 화면에 눈에 띄게 직접 출력해서 서버 응답값을 확인
+      return { 
+        text: `상태 누락: ${normalizedStatus}`, 
+        color: "text-white", 
+        bg: "bg-gray-800", 
+        icon: <AlertCircle size={16} /> 
+      };
   }
 };
 
@@ -72,17 +84,18 @@ export default function OrderHistoryPage() {
 
         if (json.success && json.data?.orders) {
           const mappedOrders: OrderInfo[] = json.data.orders.map((order: any) => {
-            const totalPrice = order.items.reduce((sum: number, item: any) => sum + item.subtotal, 0);
+            // 방어적 코드: items가 비어있을 경우 에러 방지
+            const totalPrice = order.items?.reduce((sum: number, item: any) => sum + item.subtotal, 0) || 0;
 
             return {
               orderId: `ORD-${order.orderId}`,
               date: formatDateTime(order.createdAt),
-              items: order.items.map((item: any) => ({
+              items: order.items?.map((item: any) => ({
                 name: `메뉴 ID: ${item.orderItemId}`,
                 quantity: item.quantity
-              })),
+              })) || [],
               totalPrice,
-              status: order.orderStatus as OrderStatus,
+              status: order.orderStatus, // 변환 없이 원본 그대로 전달
               accountInfo: order.orderStatus === 'PAYMENT_PENDING' ? "IBK기업은행 98215102201013 (손승현)" : undefined
             };
           });
@@ -118,7 +131,7 @@ export default function OrderHistoryPage() {
 
         {!isLoading && !error && orders.map((order) => {
           const config = getStatusConfig(order.status);
-          const timeOnly = order.date.includes(' ') ? order.date.split(' ')[1] : order.date;
+          const timeOnly = order.date ? (order.date.includes(' ') ? order.date.split(' ')[1] : order.date) : '';
 
           return (
             <div key={order.orderId} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
