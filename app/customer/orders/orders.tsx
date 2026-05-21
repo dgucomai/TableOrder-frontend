@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, Suspense } from 'react';
 import { ChevronLeft, CheckCircle2, Clock, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation'; // [추가: URL 파라미터 추출용]
 
 type OrderStatus = string;
 
@@ -20,7 +21,6 @@ interface OrderInfo {
   accountInfo?: string;
 }
 
-// ISO 타임스탬프를 YYYY.MM.DD HH:mm 형태로 변환
 const formatDateTime = (isoString: string) => {
   if (!isoString) return '';
   const date = new Date(isoString);
@@ -33,9 +33,7 @@ const formatDateTime = (isoString: string) => {
   return `${yyyy}.${mm}.${dd} ${hh}:${min}`;
 };
 
-// 정확한 상태값 매핑을 위한 설정 함수
 const getStatusConfig = (status: OrderStatus) => {
-  // 공백 제거나 대소문자 불일치로 인한 버그 원천 차단
   const normalizedStatus = status ? String(status).trim().toUpperCase() : 'UNKNOWN';
 
   switch (normalizedStatus) {
@@ -63,69 +61,166 @@ const getStatusConfig = (status: OrderStatus) => {
       };
     default:
       return { 
-        text: `상태 확인 불가 (${normalizedStatus})`, 
-        color: "text-gray-500", 
-        bg: "bg-gray-100", 
+        text: `상태 오류 (${normalizedStatus})`, 
+        color: "text-gray-600", 
+        bg: "bg-gray-200", 
         icon: <AlertCircle size={16} /> 
       };
   }
 };
 
-export default function OrderHistoryPage() {
+// [수정: 파라미터를 받아오는 메인 컴포넌트 분리]
+function OrderHistoryContent() {
+  const searchParams = useSearchParams();
+  const qt = searchParams.get('qt'); // URL에서 ?qt=값 추출
+
   const [orders, setOrders] = useState<OrderInfo[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    // 파라미터가 없으면 API 요청 자체를 막음
+    if (!qt) {
+      setError('주문 테이블 정보(qt 파라미터)가 없습니다.');
+      setIsLoading(false);
+      return;
+    }
+
     const fetchOrders = async () => {
       try {
         setIsLoading(true);
-        // API 요청
-        const response = await fetch('https://donggukcomai.shop/api/billing?qt=Nrhuz54L');
+        // 추출한 qt 파라미터를 API URL에 동적 할당
+        const response = await fetch(`https://donggukcomai.shop/api/billing?qt=${qt}`);
         
         if (!response.ok) {
-          throw new Error('API 호출에 실패했습니다.');
+          throw new Error(`API 호출 실패: 상태 코드 ${response.status}`);
         }
 
         const json = await response.json();
+        console.log("API 원본 응답 데이터:", json); // [디버깅: 서버 응답 전체 구조 확인]
 
-        // success 플래그 확인 및 데이터 존재 여부 검증
         if (json.success && json.data && Array.isArray(json.data.orders)) {
           const mappedOrders: OrderInfo[] = json.data.orders.map((order: any) => {
-            // 총 결제 금액 연산 (개별 아이템 subtotal 누적)
             const totalPrice = order.items?.reduce((sum: number, item: any) => sum + item.subtotal, 0) || 0;
+            
+            console.log(`주문 ID [${order.orderId}]의 원본 상태값:`, order.orderStatus); // [디버깅: 상태값 확인]
 
             return {
               orderId: `ORD-${order.orderId}`,
               date: formatDateTime(order.createdAt),
               items: order.items?.map((item: any) => ({
-                name: `메뉴 ID: ${item.orderItemId}`, // API 응답에 이름이 없으므로 ID로 렌더링
+                name: `메뉴 ID: ${item.orderItemId}`,
                 quantity: item.quantity
               })) || [],
               totalPrice,
               status: order.orderStatus,
-              // 상태가 PAYMENT_PENDING일 때만 계좌 정보 삽입
               accountInfo: order.orderStatus === 'PAYMENT_PENDING' ? "IBK기업은행 98215102201013 (손승현)" : undefined
             };
           });
-
-          // 주문 번호 기준 내림차순(최신순) 정렬이 필요하다면 아래 주석 해제
-          // mappedOrders.sort((a, b) => b.orderId.localeCompare(a.orderId));
           
           setOrders(mappedOrders);
         } else {
-          throw new Error('데이터 형식이 올바르지 않습니다.');
+          throw new Error('API 응답에 주문 데이터(orders 배열)가 존재하지 않습니다.');
         }
       } catch (err: any) {
-        setError(err.message || '알 수 없는 오류가 발생했습니다.');
+        console.error("Fetch 에러:", err);
+        setError(err.message || '데이터를 불러오는 중 오류가 발생했습니다.');
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchOrders();
-  }, []);
+  }, [qt]);
 
+  if (error) {
+    return <div className="text-center text-red-500 py-10 font-bold">{error}</div>;
+  }
+
+  if (isLoading) {
+    return <div className="text-center text-gray-500 py-10 font-bold">주문 내역을 불러오는 중입니다...</div>;
+  }
+
+  if (orders.length === 0) {
+    return <div className="text-center text-gray-500 py-10 font-bold">주문 내역이 없습니다.</div>;
+  }
+
+  return (
+    <main className="p-4 space-y-4">
+      {orders.map((order) => {
+        const config = getStatusConfig(order.status);
+        const timeOnly = order.date ? (order.date.includes(' ') ? order.date.split(' ')[1] : order.date) : '';
+
+        return (
+          <div key={order.orderId} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+            {/* 상단 타이틀 바: 상태 배지 */}
+            <div className="p-4 border-b border-gray-50 flex justify-between items-center bg-gray-50/50">
+              <div className="flex items-center gap-2 mt-1">
+                <div className="text-sm text-gray-500 font-medium">주문 시간: {timeOnly}</div>
+                {config.subText && (
+                  <span className={`text-[12px] font-bold ${config.color}`}>
+                    {config.subText}
+                  </span>
+                )}
+              </div>
+              
+              {/* 상태 아이콘 및 텍스트 영역 */}
+              <div className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-bold h-fit ${config.color} ${config.bg}`}>
+                {config.icon}
+                <span>{config.text}</span>
+              </div>
+            </div>
+
+            {/* 주문 메뉴 리스트 */}
+            <div className="p-4">
+              <div className="space-y-2 text-base text-gray-800 font-medium">
+                {order.items.map((item, idx) => (
+                  <div key={idx} className="flex justify-between items-center">
+                    <span>{item.name}</span>
+                    <span>{item.quantity}개</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* PAYMENT_PENDING 상태일 때만 보이는 입금 안내 계좌 영역 */}
+            {order.status === 'PAYMENT_PENDING' && order.accountInfo && (
+              <div className="bg-red-50 p-4 border-t border-red-100 flex flex-col gap-3">
+                <p className="text-xs text-red-600">
+                  아직 입금하지 않았다면 입금을 완료해주세요.
+                </p>
+                
+                <div className="flex justify-between items-center gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-black font-bold whitespace-nowrap">입금 계좌:</span>
+                    <span className="text-sm font-bold text-gray-800 tracking-tight">{order.accountInfo}</span>
+                  </div>
+                  <button 
+                    onClick={() => {
+                       navigator.clipboard.writeText("IBK기업은행 98215102201013");
+                       alert("계좌번호가 복사되었습니다.");
+                    }}
+                    className="shrink-0 bg-white border border-red-200 text-red-600 text-xs px-3 py-1.5 rounded-lg font-bold hover:bg-red-50 active:bg-red-100 transition-colors"
+                  >
+                    복사하기
+                  </button>
+                </div>
+
+                <div className="flex justify-between items-center pt-2 border-t border-red-100/50">
+                  <span className="text-sm font-bold text-gray-700">총 결제금액:</span>
+                  <span className="text-lg font-extrabold text-black">{order.totalPrice.toLocaleString()}원</span>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </main>
+  );
+}
+
+// [추가: Next.js useSearchParams 에러 방지를 위한 Suspense 래핑]
+export default function OrderHistoryPage() {
   return (
     <div className="min-h-screen bg-gray-50 pb-10">
       <header className="sticky top-0 z-10 bg-white border-b px-4 py-4 flex items-center shadow-sm">
@@ -135,80 +230,9 @@ export default function OrderHistoryPage() {
         <h1 className="flex-1 text-center text-lg font-bold text-gray-900 pr-8">주문 내역</h1>
       </header>
 
-      <main className="p-4 space-y-4">
-        {isLoading && <p className="text-center text-gray-500 py-10">주문 내역을 불러오는 중입니다...</p>}
-        {error && <p className="text-center text-red-500 py-10">{error}</p>}
-        
-        {!isLoading && !error && orders.length === 0 && (
-          <p className="text-center text-gray-500 py-10">주문 내역이 없습니다.</p>
-        )}
-
-        {!isLoading && !error && orders.map((order) => {
-          const config = getStatusConfig(order.status);
-          const timeOnly = order.date ? (order.date.includes(' ') ? order.date.split(' ')[1] : order.date) : '';
-
-          return (
-            <div key={order.orderId} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-              <div className="p-4 border-b border-gray-50 flex justify-between items-center bg-gray-50/50">
-                <div className="flex items-center gap-2 mt-1">
-                  <div className="text-sm text-gray-500 font-medium">주문 시간: {timeOnly}</div>
-                  {config.subText && (
-                    <span className={`text-[12px] font-bold ${config.color}`}>
-                      {config.subText}
-                    </span>
-                  )}
-                </div>
-                
-                <div className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-bold h-fit ${config.color} ${config.bg}`}>
-                  {config.icon}
-                  <span>{config.text}</span>
-                </div>
-              </div>
-
-              <div className="p-4">
-                <div className="space-y-2 text-base text-gray-800 font-medium">
-                  {order.items.map((item, idx) => (
-                    <div key={idx} className="flex justify-between items-center">
-                      <span>{item.name}</span>
-                      <span>{item.quantity}개</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* 입금 대기 상태 계좌정보 노출 영역 */}
-              {order.status === 'PAYMENT_PENDING' && order.accountInfo && (
-                <div className="bg-red-50 p-4 border-t border-red-100 flex flex-col gap-3">
-                  <p className="text-xs text-red-600">
-                    아직 입금하지 않았다면 입금을 완료해주세요.
-                  </p>
-                  
-                  <div className="flex justify-between items-center gap-2">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-black font-bold whitespace-nowrap">입금 계좌:</span>
-                      <span className="text-sm font-bold text-gray-800 tracking-tight">{order.accountInfo}</span>
-                    </div>
-                    <button 
-                      onClick={() => {
-                         navigator.clipboard.writeText("IBK기업은행 98215102201013");
-                         alert("계좌번호가 복사되었습니다.");
-                      }}
-                      className="shrink-0 bg-white border border-red-200 text-red-600 text-xs px-3 py-1.5 rounded-lg font-bold hover:bg-red-50 active:bg-red-100 transition-colors"
-                    >
-                      복사하기
-                    </button>
-                  </div>
-
-                  <div className="flex justify-between items-center pt-2 border-t border-red-100/50">
-                    <span className="text-sm font-bold text-gray-700">총 결제금액:</span>
-                    <span className="text-lg font-extrabold text-black">{order.totalPrice.toLocaleString()}원</span>
-                  </div>
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </main>
+      <Suspense fallback={<div className="text-center text-gray-500 py-10 font-bold">로딩중...</div>}>
+        <OrderHistoryContent />
+      </Suspense>
     </div>
   );
 }
