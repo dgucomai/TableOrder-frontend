@@ -5,7 +5,8 @@ import { X, Coins, Clock, Check, AlertTriangle, Timer, CreditCard, RotateCcw, Tr
 import { motion, AnimatePresence } from "framer-motion";
 
 interface Order {
-  id: string;
+  id: string;         // 고유 UI 렌더링용 키 (orderId-orderItemId)
+  orderId: number;    // API 통신용 실제 주문 ID
   name: string;
   quantity: number;
   price: number;
@@ -15,7 +16,8 @@ interface Order {
 }
 
 interface CallInfo {
-  id: string;
+  id: string;         // 내부 관리용 고유 키
+  callId?: number;    // 실제 직원 호출 API용 ID
   type: "직원 호출" | "딜러 호출" | "입금 확인";
   time: string;
   message?: string;
@@ -55,84 +57,107 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
     }
   };
 
+  const fetchTableDetail = async () => {
+    try {
+      const token = localStorage.getItem("staffAccessToken") || "";
+      const response = await fetch(`/api/staff/tables/${tableId}`, {
+        method: "GET",
+        headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" }
+      });
+
+      if (response.status === 401 || response.status === 403) {
+        alert("권한이 없습니다. 다시 로그인해 주세요.");
+        window.location.href = "/staff";
+        return;
+      }
+
+      const result = await response.json();
+      if (result.success && result.data) {
+        const tableData = result.data;
+        setTableNumber(tableData.tableNumber); 
+        setTokens(tableData.tokenCount || 0); 
+        setTotalAmount(tableData.totalAmount ?? tableData.tokenAmount ?? 0); 
+        setStartedAt(tableData.startedAt || null);
+
+        const mappedCalls: CallInfo[] = [];
+        if (tableData.calls && Array.isArray(tableData.calls)) {
+          tableData.calls.forEach((c: any) => {
+            if (c.status === "REQUESTED") { 
+              mappedCalls.push({ 
+                id: `call-${c.callId}`, 
+                callId: c.callId,
+                type: c.callType === "DEALER" ? "딜러 호출" : "직원 호출", 
+                time: formatTime(c.createdAt),
+                message: c.message || ""
+              });
+            }
+          });
+        }
+        if (tableData.paymentRequests && Array.isArray(tableData.paymentRequests)) {
+          tableData.paymentRequests.forEach((pr: any) => {
+            if (pr.paymentStatus === "PENDING") {
+              mappedCalls.push({ 
+                id: `pr-${pr.paymentRequestId}`, 
+                type: "입금 확인", 
+                time: formatTime(pr.requestedAt) 
+              });
+            }
+          });
+        }
+        mappedCalls.sort((a, b) => a.time.localeCompare(b.time));
+        setActiveCalls(mappedCalls);
+
+        const mappedOrders: Order[] = [];
+        if (tableData.orders && Array.isArray(tableData.orders)) {
+          tableData.orders.forEach((order: any) => {
+            const timeStr = formatTime(order.createdAt);
+            const statusStr = mapOrderStatus(order.orderStatus);
+            if (order.items && Array.isArray(order.items)) {
+              order.items.forEach((item: any) => {
+                mappedOrders.push({
+                  id: `${order.orderId}-${item.orderItemId}`,
+                  orderId: order.orderId,
+                  name: item.menuName,
+                  quantity: item.quantity,
+                  price: item.unitPrice,
+                  time: timeStr,
+                  status: statusStr as Order["status"],
+                  isTokenPayment: false
+                });
+              });
+            }
+          });
+        }
+        setOrders(mappedOrders);
+      }
+    } catch (error) {
+      console.error("테이블 상세 정보 조회 실패:", error);
+    }
+  };
+
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 60000);
-    return () => clearInterval(timer);
-  }, []);
-
-  useEffect(() => {
-    const fetchTableDetail = async () => {
-      try {
-        const token = localStorage.getItem("staffAccessToken") || "";
-        const response = await fetch(`/api/staff/tables/${tableId}`, {
-          method: "GET",
-          headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" }
-        });
-
-        if (response.status === 401 || response.status === 403) {
-          alert("권한이 없습니다. 다시 로그인해 주세요.");
-          window.location.href = "/staff";
-          return;
-        }
-
-        const result = await response.json();
-        if (result.success && result.data) {
-          const tableData = result.data;
-          setTableNumber(tableData.tableNumber); 
-          setTokens(tableData.tokenCount || 0); 
-          setTotalAmount(tableData.totalAmount ?? tableData.tokenAmount ?? 0); 
-          setStartedAt(tableData.startedAt || null);
-
-          const mappedCalls: CallInfo[] = [];
-          if (tableData.calls && Array.isArray(tableData.calls)) {
-            tableData.calls.forEach((c: any) => {
-              if (c.status === "REQUESTED") { 
-                mappedCalls.push({ 
-                  id: `call-${c.callId}`, 
-                  type: c.callType === "DEALER" ? "딜러 호출" : "직원 호출", 
-                  time: formatTime(c.createdAt),
-                  message: c.message || ""
-                });
-              }
-            });
-          }
-          if (tableData.paymentRequests && Array.isArray(tableData.paymentRequests)) {
-            tableData.paymentRequests.forEach((pr: any) => {
-              if (pr.paymentStatus === "PENDING") {
-                mappedCalls.push({ id: `pr-${pr.paymentRequestId}`, type: "입금 확인", time: formatTime(pr.requestedAt) });
-              }
-            });
-          }
-          mappedCalls.sort((a, b) => a.time.localeCompare(b.time));
-          setActiveCalls(mappedCalls);
-
-          const mappedOrders: Order[] = [];
-          if (tableData.orders && Array.isArray(tableData.orders)) {
-            tableData.orders.forEach((order: any) => {
-              const timeStr = formatTime(order.createdAt);
-              const statusStr = mapOrderStatus(order.orderStatus);
-              if (order.items && Array.isArray(order.items)) {
-                order.items.forEach((item: any) => {
-                  mappedOrders.push({
-                    id: `${order.orderId}-${item.orderItemId}`,
-                    name: item.menuName,
-                    quantity: item.quantity,
-                    price: item.unitPrice,
-                    time: timeStr,
-                    status: statusStr as Order["status"],
-                    isTokenPayment: false
-                  });
-                });
-              }
-            });
-          }
-          setOrders(mappedOrders);
-        }
-      } catch (error) {
-        console.error("테이블 상세 정보 조회 실패:", error);
+    if (tableId) fetchTableDetail();
+    
+    // [TODO] SSE 연결 주소가 백엔드 명세서에 확정되면 활성화하세요.
+    /*
+    const token = localStorage.getItem("staffAccessToken") || "";
+    const eventSource = new EventSource(`/api/sse/staff?token=${token}`);
+    
+    eventSource.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      // tableId가 현재 팝업의 tableId와 같을 경우에만 데이터를 갱신합니다.
+      if (data.table && data.table.tableId === tableId) {
+         fetchTableDetail(); // 변경 감지 시 새로고침
       }
     };
-    if (tableId) fetchTableDetail();
+    return () => {
+      clearInterval(timer);
+      eventSource.close();
+    };
+    */
+
+    return () => clearInterval(timer);
   }, [tableId]);
 
   const usageTime = useMemo(() => {
@@ -146,38 +171,121 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
     return h > 0 ? `${h}시간 ${m}분` : `${m}분`;
   }, [startedAt, currentTime]);
 
-  const handleAcceptCall = (id: string) => setActiveCalls(prev => prev.filter(call => call.id !== id));
-  const confirmGroupDeposit = (time: string) => setOrders(prev => prev.map(order => order.time === time && order.status === "입금 확인 대기" ? { ...order, status: "준비 중" } : order));
-  const toggleOrderStatus = (id: string) => setOrders(prev => prev.map(order => { if (order.id !== id || order.status === "입금 확인 대기") return order; return { ...order, status: order.status === "준비 중" ? "제공 완료" : "준비 중" }; }));
-
-  const handleDeleteGroupClick = (time: string) => { setIsEditTokenOpen(false); setIsResetOpen(false); setTimeToDelete(time); setDeleteReason(""); setIsDeleteOrderOpen(true); };
-  const executeDeleteGroup = () => { if (!timeToDelete) return; setOrders(prev => prev.filter(order => order.time !== timeToDelete)); setIsDeleteOrderOpen(false); setTimeToDelete(null); setDeleteReason(""); };
-
-  const handleResetTable = async () => {
-    console.log("초기화 요청 tableId:", tableId); 
-    if (!tableId) {
-      alert("테이블 ID를 확인할 수 없습니다.");
+  // [API 연동] 직원/딜러 호출 처리 완료 (PATCH /api/staff/calls/{callId}/resolve)
+  const handleAcceptCall = async (call: CallInfo) => {
+    if (call.id.startsWith("pr-")) {
+      // 입금 확인 호출은 하단 주문 그룹에서 '입금 확인'을 누르면 자동으로 해결됩니다.
+      alert("하단 주문 리스트에서 '입금 확인'을 진행해 주세요.");
       return;
     }
+
+    try {
+      const token = localStorage.getItem("staffAccessToken") || "";
+      const response = await fetch(`/api/staff/calls/${call.callId}/resolve`, {
+        method: "PATCH",
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      if (response.ok) {
+        setActiveCalls(prev => prev.filter(c => c.id !== call.id));
+      } else {
+        alert("호출 처리에 실패했습니다.");
+      }
+    } catch (e) {
+      alert("통신 오류가 발생했습니다.");
+    }
+  };
+
+  // [API 연동] 입금 대기 승인 (PATCH /api/staff/orders/{orderId}/approve)
+  const confirmGroupDeposit = async (time: string) => {
+    const groupOrders = groupedOrders[time].filter((o: Order) => o.status === "입금 확인 대기");
+    const uniqueOrderIds = Array.from(new Set(groupOrders.map((o: Order) => o.orderId)));
+
+    try {
+      const tokenStr = localStorage.getItem("staffAccessToken") || "";
+      await Promise.all(uniqueOrderIds.map(orderId => 
+        fetch(`/api/staff/orders/${orderId}/approve`, {
+          method: "PATCH",
+          headers: { "Authorization": `Bearer ${tokenStr}` }
+        })
+      ));
+      // 로컬 상태 즉시 갱신
+      setOrders(prev => prev.map(order => order.time === time && order.status === "입금 확인 대기" ? { ...order, status: "준비 중" } : order));
+      // 입금 확인 알림이 있었다면 화면에서 제거
+      setActiveCalls(prev => prev.filter(call => call.time !== time && call.type !== "입금 확인"));
+    } catch (e) {
+      alert("입금 승인 처리 중 오류가 발생했습니다.");
+    }
+  };
+
+  // [API 연동] 실제 주문 상태 변경 (PATCH /api/staff/orders/{orderId}/status)
+  const updateOrderStatus = async (orderId: number, currentStatus: string) => {
+    if (currentStatus === "제공 완료" || currentStatus === "입금 확인 대기") return;
+
+    try {
+      const tokenStr = localStorage.getItem("staffAccessToken") || "";
+      const response = await fetch(`/api/staff/orders/${orderId}/status`, {
+        method: "PATCH",
+        headers: { "Authorization": `Bearer ${tokenStr}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "COMPLETED" })
+      });
+      
+      if (response.ok) {
+        setOrders(prev => prev.map(order => order.orderId === orderId ? { ...order, status: "제공 완료" } : order));
+      } else {
+        alert("상태 변경에 실패했습니다.");
+      }
+    } catch (e) {
+      alert("서버 통신 오류가 발생했습니다.");
+    }
+  };
+
+  // 삭제 팝업 제어
+  const handleDeleteGroupClick = (time: string) => { 
+    setIsEditTokenOpen(false); 
+    setIsResetOpen(false); 
+    setTimeToDelete(time); 
+    setDeleteReason(""); 
+    setIsDeleteOrderOpen(true); 
+  };
+
+  // [API 연동] 주문 대기 삭제/반려 (DELETE /api/staff/orders/{orderId})
+  const executeDeleteGroup = async () => {
+    if (!timeToDelete) return; 
+    
+    const groupOrders = orders.filter(o => o.time === timeToDelete && o.status === "입금 확인 대기");
+    const uniqueOrderIds = Array.from(new Set(groupOrders.map(o => o.orderId)));
+
+    try {
+      const tokenStr = localStorage.getItem("staffAccessToken") || "";
+      await Promise.all(uniqueOrderIds.map(orderId => 
+        fetch(`/api/staff/orders/${orderId}`, {
+          method: "DELETE",
+          headers: { "Authorization": `Bearer ${tokenStr}` }
+        })
+      ));
+
+      setOrders(prev => prev.filter(order => order.time !== timeToDelete));
+      setIsDeleteOrderOpen(false); 
+      setTimeToDelete(null); 
+      setDeleteReason(""); 
+    } catch (e) {
+      alert("주문 취소 실패");
+    }
+  };
+
+  // [API 연동] 테이블 정리/초기화 (PATCH /api/staff/tables/{tableId}/clear)
+  const handleResetTable = async () => {
+    if (!tableId) return;
 
     try {
       const tokenStr = localStorage.getItem("staffAccessToken") || "";
       const response = await fetch(`/api/staff/tables/${tableId}/clear`, {
         method: "PATCH",
-        headers: {
-          "Authorization": `Bearer ${tokenStr}`
-        }
+        headers: { "Authorization": `Bearer ${tokenStr}` }
       });
 
       if (response.status === 401 || response.status === 403) {
         alert("직원 권한이 필요합니다. 다시 로그인해주세요.");
-        return;
-      }
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => null);
-        console.error("테이블 초기화 실패 상세 정보:", errorData);
-        alert(`실패 [400]: ${errorData?.message || errorData?.error || "요청 형식이 잘못되었습니다."}`);
         return;
       }
 
@@ -189,7 +297,6 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
         alert(result.message || "테이블 정리에 실패했습니다.");
       }
     } catch (error) {
-      console.error("테이블 초기화 API 호출 오류:", error);
       alert("서버와 통신하는 중 오류가 발생했습니다.");
     }
   };
@@ -209,13 +316,7 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
         body: JSON.stringify({ delta: deltaValue })
       });
 
-      if (response.status === 401 || response.status === 403) {
-        alert("권한이 없습니다.");
-        return;
-      }
-
       const result = await response.json();
-      
       if (response.ok || result.success) {
         setTokens((prev) => prev + deltaValue);
         setIsEditTokenOpen(false);
@@ -224,7 +325,6 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
         alert(result.message || "토큰 증감 처리에 실패했습니다.");
       }
     } catch (error) {
-      console.error("토큰 수정 API 호출 오류:", error);
       alert("오류가 발생했습니다.");
     }
   };
@@ -265,7 +365,6 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
                   <span className="text-[10px] sm:text-[12px] text-slate-500 font-bold uppercase tracking-widest">총 금액</span>
                   <span className="text-lg sm:text-3xl font-black text-white">{totalAmount.toLocaleString()}원</span>
                 </div>
-                {/* 2. 총 금액과 이용시간 사이에 보유 토큰 수량 추가 */}
                 <div className="flex flex-col border-l border-white/5 pl-4 sm:pl-8">
                   <span className="text-[10px] sm:text-[12px] text-yellow-500/80 font-bold uppercase tracking-widest flex items-center gap-1">
                     <Coins size={10} /> 보유 토큰
@@ -295,7 +394,6 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
                         <span className="text-lg font-black">{call.type}</span>
                         <span className="opacity-70 font-mono text-xs">{call.time}</span>
                       </div>
-                      {/* 1. 직원 호출의 내용 표시 기능 */}
                       {call.message && (
                         <div className="flex items-start gap-2 mt-2 p-2.5 bg-black/20 rounded-xl border border-white/5 text-sm font-medium break-keep">
                           <MessageSquare size={14} className="mt-0.5 opacity-70 shrink-0" />
@@ -303,7 +401,7 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
                         </div>
                       )}
                     </div>
-                    <button onClick={() => handleAcceptCall(call.id)} className="w-full bg-white/10 hover:bg-white/20 py-2.5 rounded-lg font-bold text-xs flex items-center justify-center gap-2 border border-white/10 active:scale-95 transition-all">
+                    <button onClick={() => handleAcceptCall(call)} className="w-full bg-white/10 hover:bg-white/20 py-2.5 rounded-lg font-bold text-xs flex items-center justify-center gap-2 border border-white/10 active:scale-95 transition-all">
                       <Check size={16} strokeWidth={3} /> <span>호출 수락</span>
                     </button>
                   </motion.div>
@@ -348,7 +446,14 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
                               입금 대기 중
                             </div>
                           ) : (
-                            <button onClick={() => toggleOrderStatus(order.id)} className={`px-4 py-2 sm:px-6 sm:py-3 rounded-xl font-black text-xs sm:text-sm transition-all ${order.status === "제공 완료" ? "bg-slate-700 text-slate-500" : "bg-orange-500 text-white"}`}>
+                            <button 
+                              onClick={() => updateOrderStatus(order.orderId, order.status)} 
+                              disabled={order.status === "제공 완료"}
+                              className={`px-4 py-2 sm:px-6 sm:py-3 rounded-xl font-black text-xs sm:text-sm transition-all ${
+                                order.status === "제공 완료" 
+                                ? "bg-slate-700 text-slate-500 cursor-not-allowed" 
+                                : "bg-orange-500 text-white hover:bg-orange-400 active:scale-95 shadow-lg shadow-orange-900/20"
+                              }`}>
                               {order.status}
                             </button>
                           )}
@@ -356,7 +461,6 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
                       ))}
                     </div>
 
-                    {/* 4. PAYMENT_PENDING 상태 그룹 맨 아래에 총 금액 따로 표기 */}
                     {isWaitingDeposit && (
                       <div className="mt-4 pt-4 border-t border-dashed border-emerald-500/20 flex justify-between items-center bg-emerald-500/5 p-4 rounded-xl">
                         <span className="text-sm font-bold text-emerald-500/80">입금 확인 대기 총액</span>
@@ -413,7 +517,6 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
                       className="w-full bg-[#0f172a] border border-white/10 rounded-xl p-4 text-2xl font-black text-center outline-none focus:ring-1 focus:ring-yellow-500 text-yellow-500" 
                     />
                     
-                    {/* 3. + - 버튼을 통한 증감 편의성 추가 */}
                     <div className="flex gap-2 mt-3">
                       <button onClick={() => adjustToken(-10)} className="flex-1 bg-white/5 hover:bg-white/10 py-2 rounded-lg font-bold text-slate-400 transition-colors">-10</button>
                       <button onClick={() => adjustToken(-1)} className="flex-1 bg-white/5 hover:bg-white/10 py-2 rounded-lg font-bold text-slate-400 transition-colors">-1</button>
