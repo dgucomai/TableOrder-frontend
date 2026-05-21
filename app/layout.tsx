@@ -30,6 +30,10 @@ export default function RootLayout({
       lang="ko"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
+      <head>
+        {/* 브라우저가 모든 http 요청을 https로 자동 변환하도록 강제 */}
+        <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests" />
+      </head>
       <body className="min-h-full flex flex-col">{children}</body>
     </html>
   );
