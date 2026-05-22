@@ -9,15 +9,19 @@ import {
   PackageCheck,
   Search,
   ShoppingBag,
+  ImageOff,
 } from "lucide-react";
 
+// API 명세서 규격에 맞춘 인터페이스
 interface MenuItem {
-  id: number;
-  name: string;
+  menuId: number;
+  categoryId: number;
+  categoryName: string;
+  menuName: string;
   price: number;
-  category: string;
-  image: string;
   description: string;
+  imageUrl: string | null;
+  soldOut: boolean;
 }
 
 interface StaffOrderItem {
@@ -34,59 +38,6 @@ interface StaffOrderItem {
   completedBy?: string;
   completedAt?: string;
 }
-
-const MENU_DATA: MenuItem[] = [
-  {
-    id: 1,
-    name: "시그니처 비프 버거",
-    price: 12000,
-    category: "Main",
-    image: "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=500",
-    description: "육즙 가득한 100% 소고기 패티와 특제 소스",
-  },
-  {
-    id: 2,
-    name: "크리스피 치킨 버거",
-    price: 10500,
-    category: "Main",
-    image: "https://images.unsplash.com/photo-1625813506062-0aeb1d7a094b?w=500",
-    description: "겉바속촉의 정석, 매콤달콤 치킨 패티",
-  },
-  {
-    id: 3,
-    name: "트러플 프라이",
-    price: 6500,
-    category: "Sides",
-    image: "https://images.unsplash.com/photo-1573082891205-f495f90cbca5?w=500",
-    description: "풍미 넘치는 트러플 오일과 바삭한 감자",
-  },
-  {
-    id: 4,
-    name: "코울슬로",
-    price: 3000,
-    category: "Sides",
-    image: "https://images.unsplash.com/photo-1625944525533-473f1a3d54e7?w=500",
-    description: "아삭아삭 상큼한 양배추 샐러드",
-  },
-  {
-    id: 5,
-    name: "제로 콜라",
-    price: 2500,
-    category: "Drinks",
-    image: "https://images.unsplash.com/photo-1622483767028-3f66f32aef97?w=500",
-    description: "양심의 가책을 덜어주는 제로 칼로리",
-  },
-  {
-    id: 6,
-    name: "바닐라 쉐이크",
-    price: 5500,
-    category: "Drinks",
-    image: "https://images.unsplash.com/photo-1572490122747-3968b75cc699?w=500",
-    description: "달콤하고 부드러운 우유 본연의 맛",
-  },
-];
-
-const CATEGORIES = ["All", "Main", "Sides", "Drinks"];
 
 const parseOrderTime = (value?: string) => {
   if (!value) return 0;
@@ -135,10 +86,42 @@ const getOrdersFromStorage = (): StaffOrderItem[] => {
 
 export default function StaffMenuPage() {
   const [orders, setOrders] = useState<StaffOrderItem[]>([]);
+  const [menus, setMenus] = useState<MenuItem[]>([]);
+  const [categories, setCategories] = useState<string[]>(["All"]);
   const [selectedMenu, setSelectedMenu] = useState<MenuItem | null>(null);
   const [activeCategory, setActiveCategory] = useState("All");
   const [searchKeyword, setSearchKeyword] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
 
+  // 1. 메뉴 데이터 API 호출
+  useEffect(() => {
+    const fetchMenus = async () => {
+      try {
+        setIsLoading(true);
+        const response = await fetch("/api/menus");
+        const result = await response.json();
+
+        if (result.success && result.data?.menus) {
+          const fetchedMenus = result.data.menus;
+          setMenus(fetchedMenus);
+
+          // 중복 없는 카테고리 목록 추출
+          const uniqueCategories = Array.from(
+            new Set(fetchedMenus.map((m: MenuItem) => m.categoryName))
+          ) as string[];
+          setCategories(["All", ...uniqueCategories]);
+        }
+      } catch (error) {
+        console.error("메뉴 API 호출 중 오류 발생:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchMenus();
+  }, []);
+
+  // 2. 주문 데이터 관리
   const refreshOrders = () => {
     setOrders(getOrdersFromStorage());
   };
@@ -149,7 +132,6 @@ export default function StaffMenuPage() {
     const handleStorage = (event: StorageEvent) => {
       if (event.key === "staffOrders") refreshOrders();
     };
-
     const handleFocus = () => refreshOrders();
 
     window.addEventListener("storage", handleStorage);
@@ -161,16 +143,17 @@ export default function StaffMenuPage() {
     };
   }, []);
 
+  // 3. 필터링 로직
   const filteredMenus = useMemo(() => {
-    return MENU_DATA.filter((menu) => {
-      const matchesCategory = activeCategory === "All" || menu.category === activeCategory;
-      const matchesSearch = menu.name.toLowerCase().includes(searchKeyword.trim().toLowerCase());
+    return menus.filter((menu) => {
+      const matchesCategory = activeCategory === "All" || menu.categoryName === activeCategory;
+      const matchesSearch = menu.menuName.toLowerCase().includes(searchKeyword.trim().toLowerCase());
       return matchesCategory && matchesSearch;
     });
-  }, [activeCategory, searchKeyword]);
+  }, [menus, activeCategory, searchKeyword]);
 
   const getOrdersByMenu = (menu: MenuItem) => {
-    return orders.filter((order) => order.menuId === menu.id || order.menuName === menu.name);
+    return orders.filter((order) => order.menuId === menu.menuId || order.menuName === menu.menuName);
   };
 
   const getPreparingOrders = (menu: MenuItem) => {
@@ -204,33 +187,45 @@ export default function StaffMenuPage() {
             >
               <ArrowLeft size={18} /> 메뉴 목록으로 돌아가기
             </button>
-            <p className="hidden sm:block text-sm font-bold text-slate-500 truncate">{selectedMenu.name}</p>
+            <p className="hidden sm:block text-sm font-bold text-slate-500 truncate">{selectedMenu.menuName}</p>
           </div>
         </div>
 
         <div className="mx-auto max-w-6xl p-4 md:p-6 space-y-6">
           <section className="rounded-[2rem] border border-slate-800 bg-[#1e293b] overflow-hidden shadow-2xl">
             <div className="flex flex-col md:flex-row gap-6 p-5 md:p-8 border-b border-white/5 bg-slate-800/40">
-              <img
-                src={selectedMenu.image}
-                alt={selectedMenu.name}
-                className="w-full md:w-44 h-40 md:h-44 rounded-3xl object-cover bg-slate-900"
-              />
+              {selectedMenu.imageUrl ? (
+                <img
+                  src={selectedMenu.imageUrl}
+                  alt={selectedMenu.menuName}
+                  className="w-full md:w-44 h-40 md:h-44 rounded-3xl object-cover bg-slate-900"
+                />
+              ) : (
+                <div className="w-full md:w-44 h-40 md:h-44 rounded-3xl bg-slate-800 flex flex-col items-center justify-center text-slate-500">
+                  <ImageOff size={32} className="mb-2" />
+                  <span className="text-xs font-bold">이미지 없음</span>
+                </div>
+              )}
 
               <div className="flex-1 flex flex-col justify-between gap-6">
                 <div>
                   <div className="flex items-center gap-2 mb-3">
                     <span className="px-3 py-1 rounded-full bg-orange-500/10 text-orange-500 text-xs font-black uppercase tracking-widest">
-                      {selectedMenu.category}
+                      {selectedMenu.categoryName}
                     </span>
                     <span className="px-3 py-1 rounded-full bg-slate-900 text-slate-400 text-xs font-bold">
                       {selectedMenu.price.toLocaleString()}원
                     </span>
+                    {selectedMenu.soldOut && (
+                      <span className="px-3 py-1 rounded-full bg-red-500/10 text-red-500 text-xs font-black uppercase tracking-widest border border-red-500/20">
+                        품절
+                      </span>
+                    )}
                   </div>
                   <h1 className="text-3xl md:text-5xl font-black tracking-tighter text-white">
-                    {selectedMenu.name}
+                    {selectedMenu.menuName}
                   </h1>
-                  <p className="mt-3 text-slate-400 font-medium">메뉴별 주문 상태를 확인합니다.</p>
+                  <p className="mt-3 text-slate-400 font-medium">{selectedMenu.description || "메뉴별 주문 상태를 확인합니다."}</p>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
@@ -251,6 +246,7 @@ export default function StaffMenuPage() {
             </div>
 
             <div className="p-5 md:p-8 space-y-8">
+              {/* 준비중 주문 섹션 */}
               <section>
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-xl font-black text-white flex items-center gap-2">
@@ -299,6 +295,7 @@ export default function StaffMenuPage() {
                 )}
               </section>
 
+              {/* 완료 스택 섹션 */}
               <section>
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-xl font-black text-slate-300 flex items-center gap-2">
@@ -367,7 +364,7 @@ export default function StaffMenuPage() {
           <section className="rounded-3xl border border-slate-800 bg-[#1e293b]/95 backdrop-blur p-3 shadow-xl">
             <div className="flex flex-col md:flex-row gap-3 md:items-center justify-between">
               <div className="flex gap-2 overflow-x-auto scrollbar-hide">
-                {CATEGORIES.map((category) => (
+                {categories.map((category) => (
                   <button
                     key={category}
                     onClick={() => setActiveCategory(category)}
@@ -397,70 +394,94 @@ export default function StaffMenuPage() {
       </div>
 
       <div className="mx-auto max-w-7xl p-4 md:p-6 space-y-6">
-        <section className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-5">
-          {filteredMenus.map((menu) => {
-            const preparingQuantity = getPreparingQuantity(menu);
-            const completedCount = getCompletedOrders(menu).length;
-            const menuOrderCount = getOrdersByMenu(menu).length;
-
-            return (
-              <button
-                key={menu.id}
-                onClick={() => setSelectedMenu(menu)}
-                className="group text-left rounded-[1.25rem] md:rounded-[1.75rem] border border-slate-800 bg-[#1e293b] overflow-hidden hover:border-orange-500/60 hover:-translate-y-1 transition-all shadow-xl aspect-[1/1.08] min-h-[210px] md:min-h-[260px]"
-              >
-                <div className="relative h-[40%] overflow-hidden bg-slate-900">
-                  <img
-                    src={menu.image}
-                    alt={menu.name}
-                    className="h-full w-full object-cover opacity-80 group-hover:scale-105 group-hover:opacity-100 transition-all duration-300"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-[#1e293b]/70 via-transparent to-transparent" />
-                  <div className="absolute top-2 left-2 px-2 py-1 rounded-full bg-black/50 backdrop-blur text-[10px] md:text-xs font-black text-white">
-                    {menu.category}
-                  </div>
-                </div>
-
-                <div className="h-[60%] p-3 md:p-5 flex flex-col justify-between gap-2">
-                  <div className="min-h-[2.4rem] flex items-center">
-                    <h2 className="text-base md:text-2xl font-black tracking-tight text-white leading-tight line-clamp-2">
-                      {menu.name}
-                    </h2>
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-1.5 md:gap-2 text-center">
-                    <div className="rounded-xl md:rounded-2xl bg-slate-900/70 p-2 md:p-3 flex flex-col items-center justify-center">
-                      <p className="text-[10px] md:text-xs text-slate-500 font-black">가격</p>
-                      <p className="mt-1 text-[12px] md:text-lg font-black text-slate-200 leading-tight">
-                        {menu.price.toLocaleString()}원
-                      </p>
-                    </div>
-                    <div className="rounded-xl md:rounded-2xl bg-orange-500/10 p-2 md:p-3 flex flex-col items-center justify-center">
-                      <p className="text-[10px] md:text-xs text-orange-500 font-black">준비중</p>
-                      <p className="mt-1 text-sm md:text-xl font-black text-white leading-tight">{preparingQuantity}개</p>
-                    </div>
-                    <div className="rounded-xl md:rounded-2xl bg-slate-900/70 p-2 md:p-3 flex flex-col items-center justify-center">
-                      <p className="text-[10px] md:text-xs text-slate-500 font-black">완료</p>
-                      <p className="mt-1 text-sm md:text-xl font-black text-slate-300 leading-tight">{completedCount}건</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between text-[11px] md:text-sm font-black">
-                    <span className="text-slate-500 flex items-center gap-1 md:gap-2">
-                      <ShoppingBag size={14} /> 총 {menuOrderCount}건
-                    </span>
-                    <span className="text-orange-500 group-hover:translate-x-1 transition-transform">보기 →</span>
-                  </div>
-                </div>
-              </button>
-            );
-          })}
-        </section>
-
-        {filteredMenus.length === 0 && (
-          <div className="rounded-3xl border border-dashed border-slate-700 bg-slate-900/40 p-12 text-center text-slate-500 font-bold">
-            검색 결과가 없습니다.
+        {isLoading ? (
+          <div className="flex justify-center items-center py-20 text-slate-500 font-bold">
+            메뉴 목록을 불러오는 중입니다...
           </div>
+        ) : (
+          <>
+            <section className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-5">
+              {filteredMenus.map((menu) => {
+                const preparingQuantity = getPreparingQuantity(menu);
+                const completedCount = getCompletedOrders(menu).length;
+                const menuOrderCount = getOrdersByMenu(menu).length;
+
+                return (
+                  <button
+                    key={menu.menuId}
+                    onClick={() => setSelectedMenu(menu)}
+                    className={`group text-left rounded-[1.25rem] md:rounded-[1.75rem] border border-slate-800 bg-[#1e293b] overflow-hidden hover:border-orange-500/60 hover:-translate-y-1 transition-all shadow-xl aspect-[1/1.08] min-h-[210px] md:min-h-[260px] ${
+                      menu.soldOut ? "opacity-60 grayscale hover:grayscale-0" : ""
+                    }`}
+                  >
+                    <div className="relative h-[40%] overflow-hidden bg-slate-900">
+                      {menu.imageUrl ? (
+                        <img
+                          src={menu.imageUrl}
+                          alt={menu.menuName}
+                          className="h-full w-full object-cover opacity-80 group-hover:scale-105 group-hover:opacity-100 transition-all duration-300"
+                        />
+                      ) : (
+                        <div className="h-full w-full bg-slate-800 flex items-center justify-center text-slate-600">
+                          <ImageOff size={24} />
+                        </div>
+                      )}
+                      
+                      <div className="absolute inset-0 bg-gradient-to-t from-[#1e293b]/70 via-transparent to-transparent" />
+                      <div className="absolute top-2 left-2 flex gap-1">
+                        <span className="px-2 py-1 rounded-full bg-black/50 backdrop-blur text-[10px] md:text-xs font-black text-white">
+                          {menu.categoryName}
+                        </span>
+                        {menu.soldOut && (
+                          <span className="px-2 py-1 rounded-full bg-red-500/80 backdrop-blur text-[10px] md:text-xs font-black text-white">
+                            품절
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="h-[60%] p-3 md:p-5 flex flex-col justify-between gap-2">
+                      <div className="min-h-[2.4rem] flex items-center">
+                        <h2 className="text-base md:text-2xl font-black tracking-tight text-white leading-tight line-clamp-2">
+                          {menu.menuName}
+                        </h2>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-1.5 md:gap-2 text-center">
+                        <div className="rounded-xl md:rounded-2xl bg-slate-900/70 p-2 md:p-3 flex flex-col items-center justify-center">
+                          <p className="text-[10px] md:text-xs text-slate-500 font-black">가격</p>
+                          <p className="mt-1 text-[12px] md:text-lg font-black text-slate-200 leading-tight">
+                            {menu.price.toLocaleString()}원
+                          </p>
+                        </div>
+                        <div className="rounded-xl md:rounded-2xl bg-orange-500/10 p-2 md:p-3 flex flex-col items-center justify-center">
+                          <p className="text-[10px] md:text-xs text-orange-500 font-black">준비중</p>
+                          <p className="mt-1 text-sm md:text-xl font-black text-white leading-tight">{preparingQuantity}개</p>
+                        </div>
+                        <div className="rounded-xl md:rounded-2xl bg-slate-900/70 p-2 md:p-3 flex flex-col items-center justify-center">
+                          <p className="text-[10px] md:text-xs text-slate-500 font-black">완료</p>
+                          <p className="mt-1 text-sm md:text-xl font-black text-slate-300 leading-tight">{completedCount}건</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between text-[11px] md:text-sm font-black">
+                        <span className="text-slate-500 flex items-center gap-1 md:gap-2">
+                          <ShoppingBag size={14} /> 총 {menuOrderCount}건
+                        </span>
+                        <span className="text-orange-500 group-hover:translate-x-1 transition-transform">보기 →</span>
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </section>
+
+            {filteredMenus.length === 0 && (
+              <div className="rounded-3xl border border-dashed border-slate-700 bg-slate-900/40 p-12 text-center text-slate-500 font-bold">
+                검색 결과가 없습니다.
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>
