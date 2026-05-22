@@ -12,7 +12,7 @@ import {
   ImageOff,
 } from "lucide-react";
 
-// API 명세서 규격에 맞춘 인터페이스
+// 1. 제공해주신 API 응답 데이터 규격과 완벽히 일치하는 인터페이스 선언
 interface MenuItem {
   menuId: number;
   categoryId: number;
@@ -21,7 +21,7 @@ interface MenuItem {
   price: number;
   description: string;
   imageUrl: string | null;
-  soldOut: boolean;
+  isSoldOut: boolean; // 기존 soldOut에서 API 명세인 isSoldOut으로 정확히 정정
 }
 
 interface StaffOrderItem {
@@ -93,7 +93,7 @@ export default function StaffMenuPage() {
   const [searchKeyword, setSearchKeyword] = useState("");
   const [isLoading, setIsLoading] = useState(true);
 
-  // 1. 메뉴 데이터 API 호출
+  // 메뉴 데이터 API 호출 (제공해주신 엔드포인트 적용)
   useEffect(() => {
     const fetchMenus = async () => {
       try {
@@ -101,11 +101,12 @@ export default function StaffMenuPage() {
         const response = await fetch("/api/menus");
         const result = await response.json();
 
+        // 공통 응답 포맷인 success: true 및 data.menus 경로 검증
         if (result.success && result.data?.menus) {
           const fetchedMenus = result.data.menus;
           setMenus(fetchedMenus);
 
-          // 중복 없는 카테고리 목록 추출
+          // 받아온 실제 메뉴 데이터들로부터 중복 없는 카테고리 목록 동적 생성
           const uniqueCategories = Array.from(
             new Set(fetchedMenus.map((m: MenuItem) => m.categoryName))
           ) as string[];
@@ -121,7 +122,7 @@ export default function StaffMenuPage() {
     fetchMenus();
   }, []);
 
-  // 2. 주문 데이터 관리
+  // 주문 데이터 갱신 및 로컬스토리지 동기화
   const refreshOrders = () => {
     setOrders(getOrdersFromStorage());
   };
@@ -143,7 +144,7 @@ export default function StaffMenuPage() {
     };
   }, []);
 
-  // 3. 필터링 로직
+  // 필터링 로직 (카테고리 탭 선택 및 검색어 처리)
   const filteredMenus = useMemo(() => {
     return menus.filter((menu) => {
       const matchesCategory = activeCategory === "All" || menu.categoryName === activeCategory;
@@ -176,6 +177,7 @@ export default function StaffMenuPage() {
   const selectedCompletedOrders = selectedMenu ? getCompletedOrders(selectedMenu) : [];
   const selectedPreparingQuantity = selectedPreparingOrders.reduce((sum, order) => sum + order.quantity, 0);
 
+  // [상세 보기 페이지 모드]
   if (selectedMenu) {
     return (
       <div className="h-full min-h-[calc(100vh-4rem)] bg-[#020617] text-white overflow-y-auto">
@@ -210,14 +212,14 @@ export default function StaffMenuPage() {
               <div className="flex-1 flex flex-col justify-between gap-6">
                 <div>
                   <div className="flex items-center gap-2 mb-3">
-                    <span className="px-3 py-1 rounded-full bg-orange-500/10 text-orange-500 text-xs font-black uppercase tracking-widest">
+                    <span className="px-3 py-1 rounded-full bg-orange-500/10 text-orange-500 text-xs font-black">
                       {selectedMenu.categoryName}
                     </span>
                     <span className="px-3 py-1 rounded-full bg-slate-900 text-slate-400 text-xs font-bold">
                       {selectedMenu.price.toLocaleString()}원
                     </span>
-                    {selectedMenu.soldOut && (
-                      <span className="px-3 py-1 rounded-full bg-red-500/10 text-red-500 text-xs font-black uppercase tracking-widest border border-red-500/20">
+                    {selectedMenu.isSoldOut && (
+                      <span className="px-3 py-1 rounded-full bg-red-500/10 text-red-500 text-xs font-black border border-red-500/20">
                         품절
                       </span>
                     )}
@@ -225,7 +227,7 @@ export default function StaffMenuPage() {
                   <h1 className="text-3xl md:text-5xl font-black tracking-tighter text-white">
                     {selectedMenu.menuName}
                   </h1>
-                  <p className="mt-3 text-slate-400 font-medium">{selectedMenu.description || "메뉴별 주문 상태를 확인합니다."}</p>
+                  <p className="mt-3 text-slate-400 font-medium">{selectedMenu.description || "등록된 상세 설명이 없습니다."}</p>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
@@ -246,18 +248,17 @@ export default function StaffMenuPage() {
             </div>
 
             <div className="p-5 md:p-8 space-y-8">
-              {/* 준비중 주문 섹션 */}
+              {/* 준비중 주문 리스트 */}
               <section>
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-xl font-black text-white flex items-center gap-2">
                     <Clock size={22} className="text-orange-500" /> 준비중 주문
                   </h2>
-                  <span className="hidden sm:inline text-xs font-bold text-slate-500">먼저 들어온 주문이 위에 표시됩니다.</span>
                 </div>
 
                 {selectedPreparingOrders.length === 0 ? (
                   <div className="rounded-2xl border border-dashed border-slate-700 bg-slate-900/40 p-8 text-center text-slate-500 font-bold">
-                    현재 준비중인 주문이 없습니다.
+                    현재 대기 중인 주문이 없습니다.
                   </div>
                 ) : (
                   <div className="space-y-3">
@@ -284,10 +285,6 @@ export default function StaffMenuPage() {
                           <span className="text-slate-400">수량</span>
                           <span className="mx-2 text-slate-600">|</span>
                           <span>{order.quantity}개</span>
-                          <span className="mx-3 text-slate-600">|</span>
-                          <span className="text-slate-400">상태</span>
-                          <span className="mx-2 text-slate-600">|</span>
-                          <span className="text-orange-400">준비 중</span>
                         </div>
                       </div>
                     ))}
@@ -295,18 +292,17 @@ export default function StaffMenuPage() {
                 )}
               </section>
 
-              {/* 완료 스택 섹션 */}
+              {/* 제공 완료 주문 리스트 */}
               <section>
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-xl font-black text-slate-300 flex items-center gap-2">
                     <PackageCheck size={22} className="text-slate-500" /> 제공 완료 주문
                   </h2>
-                  <span className="hidden sm:inline text-xs font-bold text-slate-500">방금 완료된 주문이 위에 표시됩니다.</span>
                 </div>
 
                 {selectedCompletedOrders.length === 0 ? (
                   <div className="rounded-2xl border border-dashed border-slate-700 bg-slate-900/40 p-8 text-center text-slate-500 font-bold">
-                    아직 제공 완료된 주문이 없습니다.
+                    제공 완료 처리된 주문 내역이 없습니다.
                   </div>
                 ) : (
                   <div className="space-y-3">
@@ -357,12 +353,15 @@ export default function StaffMenuPage() {
     );
   }
 
+  // [전체 메뉴 목록 화면 모드]
   return (
     <div className="h-full min-h-[calc(100vh-4rem)] bg-[#020617] text-white overflow-y-auto">
+      {/* 상단 네비게이션 & 필터 섹션 */}
       <div className="sticky top-0 z-40 border-b border-slate-800 bg-[#020617]/95 backdrop-blur">
         <div className="mx-auto max-w-7xl px-4 md:px-6 py-4">
           <section className="rounded-3xl border border-slate-800 bg-[#1e293b]/95 backdrop-blur p-3 shadow-xl">
             <div className="flex flex-col md:flex-row gap-3 md:items-center justify-between">
+              {/* 카테고리 탭 (API 결과에서 추출된 목록으로 매핑) */}
               <div className="flex gap-2 overflow-x-auto scrollbar-hide">
                 {categories.map((category) => (
                   <button
@@ -379,6 +378,7 @@ export default function StaffMenuPage() {
                 ))}
               </div>
 
+              {/* 실시간 메뉴 검색창 */}
               <div className="relative w-full md:w-80">
                 <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" />
                 <input
@@ -393,6 +393,7 @@ export default function StaffMenuPage() {
         </div>
       </div>
 
+      {/* 메인 메뉴 그리드 영역 */}
       <div className="mx-auto max-w-7xl p-4 md:p-6 space-y-6">
         {isLoading ? (
           <div className="flex justify-center items-center py-20 text-slate-500 font-bold">
@@ -411,9 +412,10 @@ export default function StaffMenuPage() {
                     key={menu.menuId}
                     onClick={() => setSelectedMenu(menu)}
                     className={`group text-left rounded-[1.25rem] md:rounded-[1.75rem] border border-slate-800 bg-[#1e293b] overflow-hidden hover:border-orange-500/60 hover:-translate-y-1 transition-all shadow-xl aspect-[1/1.08] min-h-[210px] md:min-h-[260px] ${
-                      menu.soldOut ? "opacity-60 grayscale hover:grayscale-0" : ""
+                      menu.isSoldOut ? "opacity-60 grayscale hover:grayscale-0" : ""
                     }`}
                   >
+                    {/* 카드 상단 이미지 영역 */}
                     <div className="relative h-[40%] overflow-hidden bg-slate-900">
                       {menu.imageUrl ? (
                         <img
@@ -432,7 +434,7 @@ export default function StaffMenuPage() {
                         <span className="px-2 py-1 rounded-full bg-black/50 backdrop-blur text-[10px] md:text-xs font-black text-white">
                           {menu.categoryName}
                         </span>
-                        {menu.soldOut && (
+                        {menu.isSoldOut && (
                           <span className="px-2 py-1 rounded-full bg-red-500/80 backdrop-blur text-[10px] md:text-xs font-black text-white">
                             품절
                           </span>
@@ -440,6 +442,7 @@ export default function StaffMenuPage() {
                       </div>
                     </div>
 
+                    {/* 카드 하단 정보 영역 */}
                     <div className="h-[60%] p-3 md:p-5 flex flex-col justify-between gap-2">
                       <div className="min-h-[2.4rem] flex items-center">
                         <h2 className="text-base md:text-2xl font-black tracking-tight text-white leading-tight line-clamp-2">
@@ -447,10 +450,11 @@ export default function StaffMenuPage() {
                         </h2>
                       </div>
 
+                      {/* 현황 대시보드 배지 */}
                       <div className="grid grid-cols-3 gap-1.5 md:gap-2 text-center">
                         <div className="rounded-xl md:rounded-2xl bg-slate-900/70 p-2 md:p-3 flex flex-col items-center justify-center">
                           <p className="text-[10px] md:text-xs text-slate-500 font-black">가격</p>
-                          <p className="mt-1 text-[12px] md:text-lg font-black text-slate-200 leading-tight">
+                          <p className="mt-1 text-[11px] md:text-base font-black text-slate-200 leading-tight truncate w-full">
                             {menu.price.toLocaleString()}원
                           </p>
                         </div>
@@ -478,7 +482,7 @@ export default function StaffMenuPage() {
 
             {filteredMenus.length === 0 && (
               <div className="rounded-3xl border border-dashed border-slate-700 bg-slate-900/40 p-12 text-center text-slate-500 font-bold">
-                검색 결과가 없습니다.
+                일치하는 메뉴가 존재하지 않습니다.
               </div>
             )}
           </>
