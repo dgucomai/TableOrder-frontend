@@ -171,51 +171,101 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
     return h > 0 ? `${h}시간 ${m}분` : `${m}분`;
   }, [startedAt, currentTime]);
 
-  // [API 연동] 직원/딜러 호출 처리 완료 (PATCH /api/staff/calls/{callId}/resolve)
+  // [API 연동] 직원/딜러 호출 처리 완료 (PATCH /api/staff/calls/{callId}/resolve?staffId={staffId})
   const handleAcceptCall = async (call: CallInfo) => {
+    // 입금 확인(결제) 호출은 별도의 하단 주문 목록에서 처리하도록 유도
     if (call.id.startsWith("pr-")) {
-      // 입금 확인 호출은 하단 주문 그룹에서 '입금 확인'을 누르면 자동으로 해결됩니다.
       alert("하단 주문 리스트에서 '입금 확인'을 진행해 주세요.");
+      return;
+    }
+
+    // API 통신을 위한 실제 callId가 없을 경우 방어 로직
+    if (!call.callId) {
+      alert("유효하지 않은 호출입니다.");
       return;
     }
 
     try {
       const token = localStorage.getItem("staffAccessToken") || "";
-      const response = await fetch(`/api/staff/calls/${call.callId}/resolve`, {
+      
+      // [TODO] 임시 하드코딩: 나중에 로그인 연동 시 실제 직원 ID로 교체하세요.
+      const staffId = 100;
+
+      // URL에 ?staffId=${staffId} 쿼리 파라미터 추가
+      const response = await fetch(`/api/staff/calls/${call.callId}/resolve?staffId=${staffId}`, {
         method: "PATCH",
-        headers: { "Authorization": `Bearer ${token}` }
+        headers: { 
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json" 
+        }
       });
-      if (response.ok) {
+
+      // 백엔드 응답 데이터 확인
+      const result = await response.json().catch(() => ({})); 
+
+      if (response.ok || result.success) {
+        // 성공 시 로컬 상태(화면)에서 해당 호출 알림만 즉시 제거
         setActiveCalls(prev => prev.filter(c => c.id !== call.id));
       } else {
-        alert("호출 처리에 실패했습니다.");
+        alert(result.message || "호출 처리에 실패했습니다.");
       }
     } catch (e) {
-      alert("통신 오류가 발생했습니다.");
+      console.error("호출 수락 에러:", e);
+      alert("서버와 통신하는 중 통신 오류가 발생했습니다.");
     }
   };
 
-  // [API 연동] 입금 대기 승인 (PATCH /api/staff/orders/{orderId}/approve)
-  const confirmGroupDeposit = async (time: string) => {
-    const groupOrders = groupedOrders[time].filter((o: Order) => o.status === "입금 확인 대기");
-    const uniqueOrderIds = Array.from(new Set(groupOrders.map((o: Order) => o.orderId)));
+// 1. [API 연동] 입금 대기 승인 (PATCH /api/staff/orders/{orderId}/approve)
+const confirmGroupDeposit = async (time: string) => {
+  // 같은 시간에 주문된 항목 중 '입금 확인 대기' 상태인 주문들만 필터링
+  const groupOrders = groupedOrders[time].filter((o: Order) => o.status === "입금 확인 대기");
+  // 중복되는 orderId를 제거하여 한 번씩만 호출되도록 처리 (단일 주문에 여러 메뉴가 있을 수 있으므로)
+  const uniqueOrderIds = Array.from(new Set(groupOrders.map((o: Order) => o.orderId)));
 
-    try {
-      const tokenStr = localStorage.getItem("staffAccessToken") || "";
-      await Promise.all(uniqueOrderIds.map(orderId => 
-        fetch(`/api/staff/orders/${orderId}/approve`, {
+  if (uniqueOrderIds.length === 0) return;
+
+  try {
+    const tokenStr = localStorage.getItem("staffAccessToken") || "";
+    
+    // 여러 개의 주문(orderId)을 동시에 승인 처리
+    const results = await Promise.all(
+      uniqueOrderIds.map(async (orderId) => {
+        const response = await fetch(`/api/staff/orders/${orderId}/approve`, {
           method: "PATCH",
-          headers: { "Authorization": `Bearer ${tokenStr}` }
-        })
+          headers: { 
+            "Authorization": `Bearer ${tokenStr}`,
+            "Content-Type": "application/json"
+          }
+        });
+        
+        if (!response.ok) throw new Error("서버 응답 오류");
+        return response.json(); // {"success":true, "message":"ORDER_APPROVED"} 형태 반환
+      })
+    );
+
+    // 모든 API 요청이 성공(success: true)했는지 검증
+    const allSuccess = results.every(result => result.success);
+
+    if (allSuccess) {
+      // 로컬 상태 즉시 갱신: 해당 시간대의 대기 주문을 '준비 중'으로 변경
+      setOrders(prev => prev.map(order => 
+        order.time === time && order.status === "입금 확인 대기" 
+          ? { ...order, status: "준비 중" } 
+          : order
       ));
-      // 로컬 상태 즉시 갱신
-      setOrders(prev => prev.map(order => order.time === time && order.status === "입금 확인 대기" ? { ...order, status: "준비 중" } : order));
-      // 입금 확인 알림이 있었다면 화면에서 제거
+      
+      // 입금 확인 알림 배지가 상단에 있었다면 화면에서 제거
       setActiveCalls(prev => prev.filter(call => call.time !== time && call.type !== "입금 확인"));
-    } catch (e) {
-      alert("입금 승인 처리 중 오류가 발생했습니다.");
+      
+      alert("입금 확인이 완료되었습니다.");
+    } else {
+      alert("일부 주문의 입금 승인 처리에 실패했습니다.");
     }
-  };
+  } catch (e) {
+    console.error(e);
+    alert("입금 승인 처리 중 네트워크 오류가 발생했습니다.");
+  }
+};
 
   // [API 연동] 실제 주문 상태 변경 (PATCH /api/staff/orders/{orderId}/status)
   const updateOrderStatus = async (orderId: number, currentStatus: string) => {
@@ -248,38 +298,64 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
     setIsDeleteOrderOpen(true); 
   };
 
-  // [API 연동] 주문 대기 삭제/반려 (DELETE /api/staff/orders/{orderId})
-  const executeDeleteGroup = async () => {
-    if (!timeToDelete) return; 
+// 2. [API 연동] 주문 대기 취소 (DELETE /api/staff/orders/{orderId})
+const executeDeleteGroup = async () => {
+  if (!timeToDelete) return; 
+  
+  const groupOrders = orders.filter(o => o.time === timeToDelete && o.status === "입금 확인 대기");
+  const uniqueOrderIds = Array.from(new Set(groupOrders.map(o => o.orderId)));
+
+  try {
+    const tokenStr = localStorage.getItem("staffAccessToken") || "";
     
-    const groupOrders = orders.filter(o => o.time === timeToDelete && o.status === "입금 확인 대기");
-    const uniqueOrderIds = Array.from(new Set(groupOrders.map(o => o.orderId)));
-
-    try {
-      const tokenStr = localStorage.getItem("staffAccessToken") || "";
-      await Promise.all(uniqueOrderIds.map(orderId => 
-        fetch(`/api/staff/orders/${orderId}`, {
+    const results = await Promise.all(
+      uniqueOrderIds.map(async (orderId) => {
+        const response = await fetch(`/api/staff/orders/${orderId}`, {
           method: "DELETE",
-          headers: { "Authorization": `Bearer ${tokenStr}` }
-        })
-      ));
+          headers: { 
+            "Authorization": `Bearer ${tokenStr}`,
+            "Content-Type": "application/json"
+          },
+          // 백엔드에서 사유를 받을 수도 있으므로 body에 담아줍니다. (백엔드 스펙에 따라 무시될 수도 있음)
+          body: JSON.stringify({ reason: deleteReason })
+        });
 
-      setOrders(prev => prev.filter(order => order.time !== timeToDelete));
-      setIsDeleteOrderOpen(false); 
-      setTimeToDelete(null); 
-      setDeleteReason(""); 
-    } catch (e) {
-      alert("주문 취소 실패");
-    }
-  };
+        if (!response.ok) throw new Error("서버 응답 오류");
+        return response.json();
+      })
+    );
 
-  // [API 연동] 테이블 정리/초기화 (PATCH /api/staff/tables/{tableId}/clear)
+    // (선택 사항) API 응답 결과에서 success 체크를 엄격히 하고 싶다면 활성화
+    // const allSuccess = results.every(result => result.success);
+    // if (!allSuccess) throw new Error("취소 실패");
+
+    // 화면에서 취소된 주문 타임라인 통째로 제거
+    setOrders(prev => prev.filter(order => order.time !== timeToDelete));
+    
+    // 모달 초기화 및 닫기
+    setIsDeleteOrderOpen(false); 
+    setTimeToDelete(null); 
+    setDeleteReason(""); 
+    
+    alert("해당 주문이 성공적으로 취소되었습니다.");
+
+  } catch (e) {
+    console.error(e);
+    alert("주문 취소 실패: 서버와 통신 중 문제가 발생했습니다.");
+  }
+};
+
+  // [API 연동] 테이블 정리/초기화 (PATCH /api/staff/tables/{tableId}/clear?staffId={staffId})
   const handleResetTable = async () => {
     if (!tableId) return;
 
     try {
       const tokenStr = localStorage.getItem("staffAccessToken") || "";
-      const response = await fetch(`/api/staff/tables/${tableId}/clear`, {
+      
+      // [TODO] 임시 하드코딩: 추후 로그인 기능 연동 시 실제 직원 ID를 불러오도록 수정하세요.
+      const staffId = 100; 
+
+      const response = await fetch(`/api/staff/tables/${tableId}/clear?staffId=${staffId}`, {
         method: "PATCH",
         headers: { "Authorization": `Bearer ${tokenStr}` }
       });
