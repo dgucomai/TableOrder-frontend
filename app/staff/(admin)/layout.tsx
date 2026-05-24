@@ -25,16 +25,15 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
     setIsMounted(true);
 
     try {
-      const sessionActive = localStorage.getItem("staffSessionActive");
+      const accessToken = localStorage.getItem("accessToken");
       const savedName = localStorage.getItem("currentStaffName");
-      
-      // 관리자 그룹 내부이므로 세션이 없으면 즉시 로그인 페이지로 튕겨냅니다.
-      if (sessionActive !== "true") {
+
+      if (!accessToken) {
         alert("로그인이 필요한 서비스입니다.");
         router.replace("/staff");
         return;
       }
-      
+
       if (savedName) {
         setAdminName(savedName);
       }
@@ -49,7 +48,9 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
 
   const handleLogout = () => {
     if (window.confirm("로그아웃하시겠습니까?")) {
-      localStorage.removeItem("staffSessionActive");
+      localStorage.removeItem("accessToken");
+      localStorage.removeItem("refreshToken");
+      localStorage.removeItem("staffId");
       localStorage.removeItem("currentStaffName");
       setAdminName("");
       router.replace("/staff");

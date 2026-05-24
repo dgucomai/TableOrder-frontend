@@ -53,7 +53,7 @@ export default function AdminHomePage() {
   // [API 연동 3] 초기 데이터 Fetch 및 SSE 연결 (컴포넌트 마운트 시 1회 실행)
   useEffect(() => {
     // 임시: 로컬 스토리지 등에서 JWT 토큰을 가져온다고 가정
-    const token = localStorage.getItem("staffAccessToken") || "";
+    const token = localStorage.getItem("accessToken") || "";
 
     const fetchInitialTables = async () => {
       try {
