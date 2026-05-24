@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import { staffFetch } from "@/lib/staffFetch";
 import { X, Coins, Clock, Check, AlertTriangle, Timer, CreditCard, RotateCcw, Trash2, MessageSquare } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -59,13 +60,12 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
 
   const fetchTableDetail = async () => {
     try {
-      const token = localStorage.getItem("accessToken") || "";
-      const response = await fetch(`/api/staff/tables/${tableId}`, {
+      const response = await staffFetch(`/api/staff/tables/${tableId}`, {
         method: "GET",
-        headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" }
+        headers: { "Content-Type": "application/json" },
       });
 
-      if (response.status === 401 || response.status === 403) {
+      if (response.status === 403) {
         alert("권한이 없습니다. 다시 로그인해 주세요.");
         window.location.href = "/staff";
         return;
@@ -186,13 +186,9 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
     }
 
     try {
-      const token = localStorage.getItem("accessToken") || "";
-      const response = await fetch(`/api/staff/calls/${call.callId}/resolve`, {
+      const response = await staffFetch(`/api/staff/calls/${call.callId}/resolve`, {
         method: "PATCH",
-        headers: { 
-          "Authorization": `Bearer ${token}`,
-          "Content-Type": "application/json" 
-        }
+        headers: { "Content-Type": "application/json" },
       });
 
       // 백엔드 응답 데이터 확인
@@ -220,16 +216,11 @@ const confirmGroupDeposit = async (time: string) => {
   if (uniqueOrderIds.length === 0) return;
 
   try {
-    const tokenStr = localStorage.getItem("accessToken") || "";
-
     const results = await Promise.all(
       uniqueOrderIds.map(async (orderId) => {
-        const response = await fetch(`/api/staff/orders/${orderId}/approve`, {
+        const response = await staffFetch(`/api/staff/orders/${orderId}/approve`, {
           method: "PATCH",
-          headers: { 
-            "Authorization": `Bearer ${tokenStr}`,
-            "Content-Type": "application/json"
-          }
+          headers: { "Content-Type": "application/json" },
         });
         
         if (!response.ok) throw new Error("서버 응답 오류");
@@ -266,11 +257,10 @@ const confirmGroupDeposit = async (time: string) => {
     if (currentStatus === "제공 완료" || currentStatus === "입금 확인 대기") return;
 
     try {
-      const tokenStr = localStorage.getItem("accessToken") || "";
-      const response = await fetch(`/api/staff/orders/${orderId}/status`, {
+      const response = await staffFetch(`/api/staff/orders/${orderId}/status`, {
         method: "PATCH",
-        headers: { "Authorization": `Bearer ${tokenStr}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "COMPLETED" })
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "COMPLETED" }),
       });
       
       if (response.ok) {
@@ -300,17 +290,12 @@ const executeDeleteGroup = async () => {
   const uniqueOrderIds = Array.from(new Set(groupOrders.map(o => o.orderId)));
 
   try {
-    const tokenStr = localStorage.getItem("accessToken") || "";
-
     const results = await Promise.all(
       uniqueOrderIds.map(async (orderId) => {
-        const response = await fetch(`/api/staff/orders/${orderId}`, {
+        const response = await staffFetch(`/api/staff/orders/${orderId}`, {
           method: "DELETE",
-          headers: { 
-            "Authorization": `Bearer ${tokenStr}`,
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({ reason: deleteReason })
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ reason: deleteReason }),
         });
 
         if (!response.ok) throw new Error("서버 응답 오류");
@@ -339,11 +324,8 @@ const executeDeleteGroup = async () => {
     if (!tableId) return;
 
     try {
-      const tokenStr = localStorage.getItem("accessToken") || "";
-
-      const response = await fetch(`/api/staff/tables/${tableId}/clear`, {
+      const response = await staffFetch(`/api/staff/tables/${tableId}/clear`, {
         method: "PATCH",
-        headers: { "Authorization": `Bearer ${tokenStr}` }
       });
 
       if (response.status === 401 || response.status === 403) {
@@ -368,14 +350,10 @@ const executeDeleteGroup = async () => {
     if (isNaN(deltaValue) || deltaValue === 0) return;
 
     try {
-      const tokenStr = localStorage.getItem("accessToken") || "";
-      const response = await fetch(`/api/tokens/${tableId}`, {
+      const response = await staffFetch(`/api/tokens/${tableId}`, {
         method: "PATCH",
-        headers: {
-          "Authorization": `Bearer ${tokenStr}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ delta: deltaValue })
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ delta: deltaValue }),
       });
 
       const result = await response.json();

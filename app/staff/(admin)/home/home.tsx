@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
+import { staffFetch } from "@/lib/staffFetch";
 // TableDetailPopup 내부에서 상세 조회(GET /api/staff/tables/{tableId}) API를 호출하도록 구현되어야 합니다.
 import TableDetailPopup from "@/components/TableDetailPopup";
 
@@ -57,17 +58,13 @@ export default function AdminHomePage() {
 
     const fetchInitialTables = async () => {
       try {
-        const response = await fetch("/api/staff/tables", {
+        const response = await staffFetch("/api/staff/tables", {
           method: "GET",
-          headers: {
-            "Authorization": `Bearer ${token}`,
-            "Content-Type": "application/json"
-          }
+          headers: { "Content-Type": "application/json" },
         });
 
-        // 명세서 기반 인증 예외 처리 (401, 403)
-        if (response.status === 401 || response.status === 403) {
-          alert(response.status === 401 ? "로그인이 필요합니다." : "직원 권한이 필요합니다.");
+        if (response.status === 403) {
+          alert("직원 권한이 필요합니다.");
           window.location.href = "/staff";
           return;
         }

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
+import { staffFetch } from "@/lib/staffFetch";
 
 export default function SalesReport() {
   // 화면에 띄울 텍스트(매출액 또는 에러 메시지)를 하나의 상태로 관리합니다.
@@ -9,10 +10,7 @@ export default function SalesReport() {
   useEffect(() => {
     const fetchSalesData = async () => {
       try {
-        const token = localStorage.getItem("accessToken") || "";
-        const response = await fetch('/api/admin/sales', {
-          headers: { "Authorization": `Bearer ${token}` }
-        });
+        const response = await staffFetch('/api/admin/sales');
         const result = await response.json();
 
         // 성공 여부에 따라 화면에 띄울 값을 다르게 설정합니다.
