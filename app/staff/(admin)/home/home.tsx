@@ -293,9 +293,9 @@ export default function AdminHomePage() {
 
       {/* 액션 처리 팝업 */}
       {selectedTable && (
-        <TableDetailPopup 
-          tableId={selectedTable} 
-          onClose={() => setSelectedTable(null)} 
+        <TableDetailPopup
+          tableId={selectedTable}
+          onClose={() => { setSelectedTable(null); fetchInitialTables(); }}
         />
       )}
     </div>

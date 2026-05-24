@@ -21,16 +21,34 @@ export function SseProvider({ children }: { children: ReactNode }) {
       const es = new EventSource(`/api/sse/connect?token=${token}`);
       eventSourceRef.current = es;
 
-      es.addEventListener("heartbeat", () => {});
-
-      es.onmessage = (event) => {
+      const dispatchSseEvent = (eventType: string, raw: string) => {
         try {
-          const { type, ...data } = JSON.parse(event.data);
-          subscribersRef.current.get(type)?.forEach((handler) => handler(data));
+          const data = JSON.parse(raw);
+          subscribersRef.current.get(eventType)?.forEach((handler) => handler(data));
         } catch (e) {
           console.error("SSE 파싱 에러:", e);
         }
       };
+
+      const NAMED_EVENTS = [
+        "heartbeat",
+        "PAYMENT_REQUEST_CREATED",
+        "STAFF_CALL_CREATED",
+        "DEALER_CALL_CREATED",
+        "ORDER_APPROVED",
+        "ORDER_REJECTED",
+        "ORDER_STATUS_CHANGED",
+        "CALL_RESOLVED",
+        "TABLE_STATUS_CHANGED",
+        "TOKEN_UPDATED",
+      ];
+
+      NAMED_EVENTS.forEach((eventType) => {
+        es.addEventListener(eventType, (e: MessageEvent) => {
+          if (eventType === "heartbeat") return;
+          dispatchSseEvent(eventType, e.data);
+        });
+      });
 
       es.onerror = async () => {
         if (isHandlingErrorRef.current) return;
