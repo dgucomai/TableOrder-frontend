@@ -66,7 +66,7 @@ const getStatusConfig = (status: OrderStatus) => {
         bg: "bg-pink-100", 
         icon: <AlertCircle size={16} /> 
       };
-    case 'CANCLLED':
+    case 'CANCELLED':
       return { 
         text: "주문 취소", 
         color: "text-pink-500", 
