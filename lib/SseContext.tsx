@@ -24,9 +24,7 @@ export function SseProvider({ children }: { children: ReactNode }) {
       const dispatchSseEvent = (eventType: string, raw: string) => {
         try {
           const data = JSON.parse(raw);
-          const handlers = subscribersRef.current.get(eventType);
-          console.log(`[SSE] ${eventType}`, data, `handlers: ${handlers?.size ?? 0}`);
-          handlers?.forEach((handler) => handler(data));
+          subscribersRef.current.get(eventType)?.forEach((handler) => handler(data));
         } catch (e) {
           console.error("SSE 파싱 에러:", e);
         }
@@ -48,7 +46,6 @@ export function SseProvider({ children }: { children: ReactNode }) {
 
       NAMED_EVENTS.forEach((eventType) => {
         es.addEventListener(eventType, (e: MessageEvent) => {
-          console.log(`[SSE recv] ${eventType}`, e.data);
           if (eventType === "heartbeat") return;
           dispatchSseEvent(eventType, e.data);
         });
