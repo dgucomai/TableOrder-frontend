@@ -13,12 +13,15 @@ const SseContext = createContext<SseContextValue>({ subscribe: () => () => {} })
 export function SseProvider({ children }: { children: ReactNode }) {
   const subscribersRef = useRef<Map<string, Set<SseHandler>>>(new Map());
   const eventSourceRef = useRef<EventSource | null>(null);
+  const isHandlingErrorRef = useRef(false);
 
   useEffect(() => {
     const connectSse = (token: string) => {
       eventSourceRef.current?.close();
       const es = new EventSource(`/api/sse/connect?token=${token}`);
       eventSourceRef.current = es;
+
+      es.addEventListener("heartbeat", () => {});
 
       es.onmessage = (event) => {
         try {
@@ -29,10 +32,9 @@ export function SseProvider({ children }: { children: ReactNode }) {
         }
       };
 
-      let isHandlingError = false;
       es.onerror = async () => {
-        if (isHandlingError) return;
-        isHandlingError = true;
+        if (isHandlingErrorRef.current) return;
+        isHandlingErrorRef.current = true;
         es.close();
         try {
           const refreshToken = localStorage.getItem("refreshToken") || "";
@@ -47,6 +49,7 @@ export function SseProvider({ children }: { children: ReactNode }) {
             if (data.data.refreshToken) {
               localStorage.setItem("refreshToken", data.data.refreshToken);
             }
+            isHandlingErrorRef.current = false;
             connectSse(data.data.accessToken);
           } else {
             localStorage.removeItem("accessToken");
