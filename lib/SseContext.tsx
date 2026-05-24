@@ -29,7 +29,10 @@ export function SseProvider({ children }: { children: ReactNode }) {
         }
       };
 
+      let isHandlingError = false;
       es.onerror = async () => {
+        if (isHandlingError) return;
+        isHandlingError = true;
         es.close();
         try {
           const refreshToken = localStorage.getItem("refreshToken") || "";
