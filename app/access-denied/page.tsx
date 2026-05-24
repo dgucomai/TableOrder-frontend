@@ -1,5 +1,5 @@
 import { Metadata } from "next";
-import Goback from "./goback"; // 알맹이 불러오기
+import Goback from "./access-denied"; // 알맹이 불러오기
 
 export const metadata: Metadata = {
   title: "토큰 만료", 
