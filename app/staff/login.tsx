@@ -3,6 +3,24 @@
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 
+function LoginErrorModal({ message, onClose }: { message: string; onClose: () => void }) {
+  if (!message) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+      <div className="bg-[#1e293b] border border-slate-700 rounded-2xl p-6 sm:p-8 w-[90%] max-w-sm shadow-2xl text-center">
+        <div className="text-3xl mb-4">⚠️</div>
+        <p className="text-slate-100 font-semibold text-base sm:text-lg mb-6">{message}</p>
+        <button
+          onClick={onClose}
+          className="w-full py-3 bg-orange-500 hover:bg-orange-600 active:scale-95 text-white font-bold rounded-xl transition-all"
+        >
+          확인
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function StaffLoginPage() {
   const router = useRouter();
   const [isMounted, setIsMounted] = useState(false);
@@ -12,6 +30,8 @@ export default function StaffLoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [isNameValid, setIsNameValid] = useState(false);
   const [isPwValid, setIsPwValid] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
 
   useEffect(() => {
     setIsMounted(true);
@@ -21,8 +41,7 @@ export default function StaffLoginPage() {
         setName(savedName);
         setRememberMe(true);
       }
-      const sessionActive = localStorage.getItem("staffSessionActive");
-      if (sessionActive === "true") {
+      if (localStorage.getItem("accessToken")) {
         router.replace("/staff/home");
       }
     } catch (error) {
@@ -31,27 +50,48 @@ export default function StaffLoginPage() {
   }, [router]);
 
   useEffect(() => {
-    // 💡 변경점 1: 한글 3자 제한 제거. 빈 값이 아니면 유효한 것으로 처리 (추후 JWT 로그인에 유연하게 대응)
     setIsNameValid(name.trim().length > 0);
     setIsPwValid(/^\d{6}$/.test(password));
   }, [name, password]);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isNameValid && isPwValid) {
-      // TODO: 추후 이곳에 JWT 로그인(API 호출) 로직을 추가하세요.
-      try {
-        if (rememberMe) {
-          localStorage.setItem("rememberedStaffName", name);
-        } else {
-          localStorage.removeItem("rememberedStaffName");
-        }
-        localStorage.setItem("staffSessionActive", "true");
-        localStorage.setItem("currentStaffName", name);
-      } catch (error) {
-        console.warn("로그인 정보 저장 실패", error);
+    if (!isNameValid || !isPwValid) return;
+
+    setIsLoading(true);
+    setErrorMessage("");
+
+    try {
+      const res = await fetch("/api/staff/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ staffName: name, password }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || data.success === false) {
+        setErrorMessage(data.message || "로그인에 실패했습니다.");
+        return;
       }
-      router.push("/staff/home"); 
+
+      const { accessToken, refreshToken, staffId, staffName } = data.data;
+      localStorage.setItem("accessToken", accessToken);
+      localStorage.setItem("refreshToken", refreshToken);
+      localStorage.setItem("staffId", String(staffId));
+      localStorage.setItem("currentStaffName", staffName);
+
+      if (rememberMe) {
+        localStorage.setItem("rememberedStaffName", name);
+      } else {
+        localStorage.removeItem("rememberedStaffName");
+      }
+
+      router.push("/staff/home");
+    } catch {
+      setErrorMessage("서버와 연결할 수 없습니다. 잠시 후 다시 시도해주세요.");
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -135,18 +175,20 @@ export default function StaffLoginPage() {
 
             <button
               type="submit"
-              disabled={!isNameValid || !isPwValid}
+              disabled={!isNameValid || !isPwValid || isLoading}
               className={`w-full py-3 sm:py-4 rounded-lg sm:rounded-xl font-bold text-base sm:text-lg transition-all mt-2 ${
-                isNameValid && isPwValid 
-                  ? 'bg-orange-500 hover:bg-orange-600 active:scale-95 shadow-lg shadow-orange-500/20 text-white' 
+                isNameValid && isPwValid && !isLoading
+                  ? 'bg-orange-500 hover:bg-orange-600 active:scale-95 shadow-lg shadow-orange-500/20 text-white'
                   : 'bg-slate-700 cursor-not-allowed opacity-50 text-slate-300'
               }`}
             >
-              로그인
+              {isLoading ? "로그인 중..." : "로그인"}
             </button>
           </form>
         </div>
       </div>
+
+      <LoginErrorModal message={errorMessage} onClose={() => setErrorMessage("")} />
     </div>
   );
 }
