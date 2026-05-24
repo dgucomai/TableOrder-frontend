@@ -180,12 +180,25 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
       o.orderId === orderId ? { ...o, orderStatus: mapped } : o
     ));
   });
+  useSseEvent("ITEM_STATUS_CHANGED", ({ orderId, itemId, status }: any) => {
+    const itemStatus = status === "SERVED" ? "제공 완료" : "준비 중";
+    setOrders((prev) => {
+      const hasItem = prev.some((o) => o.orderId === orderId && o.orderItemId === itemId);
+      if (!hasItem) return prev;
+      return prev.map((o) =>
+        o.orderId === orderId && o.orderItemId === itemId ? { ...o, itemStatus: itemStatus as Order["itemStatus"] } : o
+      );
+    });
+  });
   useSseEvent("CALL_RESOLVED", ({ tableId: id, callId }: any) => {
     if (id !== tableId) return;
     setActiveCalls((prev) => prev.filter((c) => c.callId !== callId));
   });
   useSseEvent("TABLE_STATUS_CHANGED", ({ tableId: id }: any) => {
     if (id === tableId) fetchTableDetail();
+  });
+  useSseEvent("TABLE_AMOUNT_CHANGED", ({ tableId: id, totalAmount: amount }: any) => {
+    if (id === tableId) setTotalAmount(amount);
   });
   useSseEvent("TOKEN_UPDATED", ({ tableId: id, tokenCount }: any) => {
     if (id === tableId) setTokens(tokenCount);
