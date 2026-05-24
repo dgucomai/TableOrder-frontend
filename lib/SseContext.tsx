@@ -38,8 +38,10 @@ export function SseProvider({ children }: { children: ReactNode }) {
         "ORDER_APPROVED",
         "ORDER_REJECTED",
         "ORDER_STATUS_CHANGED",
+        "ITEM_STATUS_CHANGED",
         "CALL_RESOLVED",
         "TABLE_STATUS_CHANGED",
+        "TABLE_AMOUNT_CHANGED",
         "TOKEN_UPDATED",
       ];
 
