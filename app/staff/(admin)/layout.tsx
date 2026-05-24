@@ -1,158 +1,152 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useRouter, usePathname } from "next/navigation";
-import Link from "next/link";
-import { Menu, X, LogOut, User } from "lucide-react";
+import { useRouter } from "next/navigation";
 
-export default function StaffLayout({ children }: { children: React.ReactNode }) {
-  const [adminName, setAdminName] = useState("");
-  const [isMounted, setIsMounted] = useState(false);
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
+export default function StaffLoginPage() {
   const router = useRouter();
-  const pathname = usePathname();
-
-  const navLinks = [
-    { href: "/staff/home", label: "홈" },
-    { href: "/staff/menu", label: "메뉴" },
-    { href: "/staff/calls", label: "호출" },
-    { href: "/staff/log", label: "기록" },
-    { href: "/staff/qr", label: "QR 생성기" },
-    { href: "/staff/sales", label: "매출 현황" },
-  ];
+  const [isMounted, setIsMounted] = useState(false);
+  const [name, setName] = useState("");
+  const [password, setPassword] = useState("");
+  const [rememberMe, setRememberMe] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [isNameValid, setIsNameValid] = useState(false);
+  const [isPwValid, setIsPwValid] = useState(false);
 
   useEffect(() => {
     setIsMounted(true);
-
     try {
-      const sessionActive = localStorage.getItem("staffSessionActive");
-      const savedName = localStorage.getItem("currentStaffName");
-      
-      // 관리자 그룹 내부이므로 세션이 없으면 즉시 로그인 페이지로 튕겨냅니다.
-      if (sessionActive !== "true") {
-        alert("로그인이 필요한 서비스입니다.");
-        router.replace("/staff");
-        return;
-      }
-      
+      const savedName = localStorage.getItem("rememberedStaffName");
       if (savedName) {
-        setAdminName(savedName);
+        setName(savedName);
+        setRememberMe(true);
+      }
+      const sessionActive = localStorage.getItem("staffSessionActive");
+      if (sessionActive === "true") {
+        router.replace("/staff/home");
       }
     } catch (error) {
-      console.warn("로컬 스토리지에 접근할 수 없습니다.", error);
+      console.warn("로컬 스토리지를 사용할 수 없는 환경입니다.", error);
     }
-  }, [pathname, router]);
+  }, [router]);
 
   useEffect(() => {
-    setIsMenuOpen(false);
-  }, [pathname]);
+    // 💡 변경점 1: 한글 3자 제한 제거. 빈 값이 아니면 유효한 것으로 처리 (추후 JWT 로그인에 유연하게 대응)
+    setIsNameValid(name.trim().length > 0);
+    setIsPwValid(/^\d{6}$/.test(password));
+  }, [name, password]);
 
-  const handleLogout = () => {
-    if (window.confirm("로그아웃하시겠습니까?")) {
-      localStorage.removeItem("staffSessionActive");
-      localStorage.removeItem("currentStaffName");
-      setAdminName("");
-      router.replace("/staff");
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (isNameValid && isPwValid) {
+      // TODO: 추후 이곳에 JWT 로그인(API 호출) 로직을 추가하세요.
+      try {
+        if (rememberMe) {
+          localStorage.setItem("rememberedStaffName", name);
+        } else {
+          localStorage.removeItem("rememberedStaffName");
+        }
+        localStorage.setItem("staffSessionActive", "true");
+        localStorage.setItem("currentStaffName", name);
+      } catch (error) {
+        console.warn("로그인 정보 저장 실패", error);
+      }
+      router.push("/staff/home"); 
     }
   };
 
-  // 마운트 전 서버-클라이언트 불일치(Hydration) 방지 구조 유지
-  if (!isMounted) return <div className="min-h-screen bg-[#0f172a]" />;
+  if (!isMounted) {
+    return <div className="bg-[#0f172a]" style={{ minHeight: '100vh' }}></div>;
+  }
 
   return (
-    <div className="min-h-[100dvh] bg-[#0f172a] text-white flex flex-col">
-      {/* 네비게이션 바 */}
-      <nav className="h-16 border-b border-slate-800 bg-[#1e293b] flex items-center justify-between px-4 md:px-6 sticky top-0 z-[100]">
-        <div className="flex items-center space-x-4 md:space-x-8">
-          {/* 모바일 햄버거 버튼 (언제나 노출) */}
-          <button 
-            onClick={() => setIsMenuOpen(!isMenuOpen)}
-            className="md:hidden p-2 hover:bg-slate-700 rounded-lg transition-colors"
-            type="button"
-          >
-            {isMenuOpen ? <X size={24} /> : <Menu size={24} />}
-          </button>
-
-          {/* 로고 링크 */}
-          <Link href="/staff/home" replace={pathname !== '/staff/home'} className="text-xl font-black text-orange-500 tracking-tighter hover:opacity-80 transition-opacity">
-            CAISINO STAFF
-          </Link>
-          
-          {/* 데스크탑 네비게이션 메뉴 */}
-          <div className="hidden md:flex space-x-6 text-sm font-medium">
-            {navLinks.map((link) => (
-              <Link 
-                key={link.href} 
-                href={link.href} 
-                replace={pathname !== '/staff/home'} // 조건부 replace 적용
-                className={`transition-colors ${pathname === link.href ? 'text-orange-500' : 'hover:text-orange-500'}`}
-              >
-                {link.label}
-              </Link>
-            ))}
-          </div>
-        </div>
-        
-        {/* 우측 관리자 정보 및 로그아웃 */}
-        <div className="flex items-center gap-3">
-          <div className="hidden sm:flex flex-col items-end text-[12px] md:text-sm text-slate-400">
-            <div>
-              관리자 <span className="text-white font-bold">{adminName || "확인 중..."}</span> 님
-            </div>
-          </div>
-          {adminName && (
-            <button 
-              onClick={handleLogout} 
-              className="p-2 md:p-0 md:text-xs text-slate-500 hover:text-red-400 transition-colors"
-              title="로그아웃"
-              type="button"
-            >
-              <LogOut size={18} className="md:hidden" />
-              <span className="hidden md:inline">로그아웃</span>
-            </button>
-          )}
-        </div>
+    <div className="flex flex-col min-h-[100dvh] bg-[#0f172a] text-white">
+      
+      <nav className="h-16 border-b border-slate-800 bg-[#1e293b] flex items-center px-4 md:px-6 sticky top-0 z-[100] w-full">
+        <span className="text-xl font-black text-orange-500 tracking-tighter cursor-default">
+          CAISINO
+        </span>
       </nav>
 
-      {/* 모바일 사이드 메뉴 */}
-      {isMenuOpen && (
-        <>
-          <div className="fixed inset-0 bg-black/60 z-[80] md:hidden" onClick={() => setIsMenuOpen(false)} />
-          <aside className="fixed left-0 top-16 bottom-0 w-64 bg-[#1e293b] border-r border-slate-800 z-[90] md:hidden p-6 flex flex-col">
-            <div className="mb-8 pb-6 border-b border-slate-800">
-              <div className="flex items-center gap-3 text-slate-400 mb-2">
-                <User size={16} />
-                <span className="text-sm font-medium">현재 접속자</span>
-              </div>
-              <div className="text-lg font-bold text-white">{adminName} 관리자님</div>
+      <div className="flex-1 flex items-center justify-center p-4 sm:p-6 md:p-8">
+        <div className="w-full max-w-[320px] sm:max-w-sm md:max-w-md bg-[#1e293b] rounded-2xl sm:rounded-3xl p-6 sm:p-8 md:p-10 shadow-2xl border border-slate-700">
+          
+          <div className="text-center mb-8 sm:mb-10">
+            <div className="inline-block p-3 sm:p-4 bg-orange-500/10 rounded-xl sm:rounded-2xl mb-3 sm:mb-4">
+              {/* 💡 변경점 2: 이모지 아이콘을 favicon.ico 이미지로 교체 */}
+              <img 
+                src="/favicon.ico" 
+                alt="CAISINO Logo" 
+                className="w-8 h-8 sm:w-10 sm:h-10 mx-auto" 
+              />
             </div>
-            <nav className="flex flex-col gap-4">
-              {navLinks.map((link) => (
-                <Link 
-                  key={link.href} 
-                  href={link.href}
-                  replace={pathname !== '/staff/home'} // 조건부 replace 적용
-                  className={`text-lg font-semibold py-2 ${pathname === link.href ? 'text-orange-500' : 'text-slate-300'}`}
-                >
-                  {link.label}
-                </Link>
-              ))}
-            </nav>
-            <button 
-              onClick={handleLogout}
-              className="mt-auto flex items-center justify-center gap-2 bg-red-500/10 text-red-500 py-4 rounded-xl font-bold"
-              type="button"
-            >
-              <LogOut size={18} /> 로그아웃
-            </button>
-          </aside>
-        </>
-      )}
+            <h2 className="text-xs sm:text-sm font-semibold text-orange-500 tracking-widest uppercase mb-1">CAISINO</h2>
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-100">STAFF LOGIN</h1>
+          </div>
 
-      {/* 본문 콘텐츠 */}
-      <main className="flex-1 overflow-x-hidden overflow-y-auto">
-        {children}
-      </main>
+          <form onSubmit={handleLogin} className="space-y-4 sm:space-y-5">
+            <div>
+              {/* 💡 변경점 3: 라벨과 placeholder를 ID/이름 입력에 맞게 수정 */}
+              <label className="block text-xs sm:text-sm font-medium text-slate-400 mb-1 sm:mb-2 ml-1">아이디 (또는 이름)</label>
+              <input
+                type="text"
+                placeholder="아이디를 입력하세요"
+                value={name}
+                onChange={(e) => setName(e.target.value.replace(/\s+/g, ''))}
+                className={`w-full bg-[#0f172a] border ${name && !isNameValid ? 'border-red-500/50' : 'border-slate-600'} rounded-lg sm:rounded-xl py-3 px-4 sm:py-4 sm:px-5 text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-orange-500 transition-all`}
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs sm:text-sm font-medium text-slate-400 mb-1 sm:mb-2 ml-1">비밀번호 (6자리)</label>
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  maxLength={6}
+                  placeholder="● ● ● ● ● ●"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value.replace(/\D/g, ''))}
+                  className={`w-full bg-[#0f172a] border ${password && !isPwValid ? 'border-red-500/50' : 'border-slate-600'} rounded-lg sm:rounded-xl py-3 pl-4 pr-12 sm:py-4 sm:pl-5 sm:pr-14 focus:outline-none focus:ring-2 focus:ring-orange-500 transition-all tracking-[0.2em] sm:tracking-[0.3em] text-center text-base sm:text-lg`}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 z-10 p-2 text-slate-500 hover:text-slate-300 transition-colors text-sm sm:text-base flex items-center justify-center cursor-pointer"
+                >
+                  {showPassword ? "🙈" : "👁️"}
+                </button>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between px-1">
+              <label className="flex items-center space-x-2 cursor-pointer group">
+                <input
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  className="w-3.5 h-3.5 sm:w-4 sm:h-4 rounded border-slate-600 bg-slate-800 text-orange-500 focus:ring-orange-500 accent-orange-500"
+                />
+                {/* 💡 변경점 4: '이름 기억하기' -> '아이디 기억하기'로 자연스럽게 텍스트 수정 */}
+                <span className="text-xs sm:text-sm text-slate-400 group-hover:text-slate-200 transition-colors">아이디 기억하기</span>
+              </label>
+            </div>
+
+            <button
+              type="submit"
+              disabled={!isNameValid || !isPwValid}
+              className={`w-full py-3 sm:py-4 rounded-lg sm:rounded-xl font-bold text-base sm:text-lg transition-all mt-2 ${
+                isNameValid && isPwValid 
+                  ? 'bg-orange-500 hover:bg-orange-600 active:scale-95 shadow-lg shadow-orange-500/20 text-white' 
+                  : 'bg-slate-700 cursor-not-allowed opacity-50 text-slate-300'
+              }`}
+            >
+              로그인
+            </button>
+          </form>
+        </div>
+      </div>
     </div>
   );
 }
