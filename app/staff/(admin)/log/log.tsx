@@ -1,258 +1,122 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
-import { Clock, CreditCard, User } from "lucide-react";
+import React, { useMemo, useEffect } from "react";
+import { Clock, CreditCard, User, RefreshCw, Loader2 } from "lucide-react";
+import { useInfiniteQuery } from "@tanstack/react-query";
+import { useInView } from "react-intersection-observer";
+import { staffFetch } from "@/lib/staffFetch"; // JWT가 적용된 fetch 유틸리티
 
-type LogType =
-  | "호출"
-  | "상태변경"
-  | "로그인"
-  | "로그아웃"
-  | "입금확인"
-  | "토큰수정"
-  | "테이블초기화"
-  | "품절처리"
-  | "주문취소"
-  | "메뉴변경";
-
-type FilterType = "전체" | LogType;
-
-interface LogItem {
-  id: string;
-  type: LogType;
-  title: string;
-  description: string;
-  time: string;
-  staffName: string;
-  tableNumber?: number;
-  detail?: string;
+// API 응답에 맞춘 로그 아이템 타입 정의
+interface ApiLogItem {
+  logId: number;
+  category: string;
+  action: string;
+  message: string;
+  createdAt: string;
 }
 
-export default function StaffLogPage() {
-  const [activeFilter, setActiveFilter] = useState<FilterType>("전체");
+// API 응답 전체 구조 타입
+interface LogApiResponse {
+  success: boolean;
+  data: {
+    logs: ApiLogItem[];
+    cursor: {
+      nextCursor: number | null;
+      hasNext: boolean;
+    };
+  };
+  message: string | null;
+}
 
-  const logs: LogItem[] = [
-    {
-      id: "log-1",
-      type: "로그인",
-      title: "직원 로그인",
-      description: "김도윤 관리자가 로그인했습니다.",
-      time: "20:30",
-      staffName: "김도윤",
-    },
-    {
-      id: "log-2",
-      type: "호출",
-      title: "직원 호출 수락",
-      description: "12번 테이블의 직원 호출을 수락했습니다.",
-      time: "20:41",
-      staffName: "김도윤",
-      tableNumber: 12,
-      detail: "요청사항: 물 좀 주세요",
-    },
-    {
-      id: "log-3",
-      type: "호출",
-      title: "딜러 호출 수락",
-      description: "14번 테이블의 딜러 호출을 수락했습니다.",
-      time: "20:45",
-      staffName: "김도윤",
-      tableNumber: 14,
-    },
-    {
-      id: "log-4",
-      type: "입금확인",
-      title: "입금 확인 처리",
-      description: "5번 테이블의 입금 확인을 처리했습니다.",
-      time: "20:48",
-      staffName: "김도윤",
-      tableNumber: 5,
-      detail: "처리 후 주문 상태: 준비 중",
-    },
-    {
-      id: "log-5",
-      type: "상태변경",
-      title: "주문 상태 변경",
-      description: "8번 테이블의 주문 상태를 제공 완료로 변경했습니다.",
-      time: "20:52",
-      staffName: "김도윤",
-      tableNumber: 8,
-      detail: "나초 치즈: 준비 중 → 제공 완료",
-    },
-    {
-      id: "log-6",
-      type: "토큰수정",
-      title: "토큰 수량 변경",
-      description: "3번 테이블의 토큰 수량을 수정했습니다.",
-      time: "21:01",
-      staffName: "김도윤",
-      tableNumber: 3,
-      detail: "7개 → 10개 / 사유: 현장 추가 구매",
-    },
-    {
-      id: "log-7",
-      type: "주문취소",
-      title: "주문 취소",
-      description: "9번 테이블의 주문을 취소했습니다.",
-      time: "21:07",
-      staffName: "김도윤",
-      tableNumber: 9,
-      detail: "취소 사유: 손님 요청",
-    },
-    {
-      id: "log-8",
-      type: "테이블초기화",
-      title: "테이블 초기화",
-      description: "11번 테이블을 초기화했습니다.",
-      time: "21:15",
-      staffName: "김도윤",
-      tableNumber: 11,
-      detail: "테이블 상태: 이용 중 → 빈 테이블",
-    },
-    {
-      id: "log-9",
-      type: "품절처리",
-      title: "메뉴 품절 처리",
-      description: "메뉴를 품절 상태로 변경했습니다.",
-      time: "21:22",
-      staffName: "김도윤",
-      detail: "잭다니엘 허니: 판매 중 → 품절",
-    },
-    {
-      id: "log-10",
-      type: "메뉴변경",
-      title: "메뉴 상태 변경",
-      description: "메뉴 판매 상태를 변경했습니다.",
-      time: "21:30",
-      staffName: "김도윤",
-      detail: "모듬 과일: 품절 → 판매 중",
-    },
-    {
-      id: "log-11",
-      type: "로그아웃",
-      title: "직원 로그아웃",
-      description: "김도윤 관리자가 로그아웃했습니다.",
-      time: "22:10",
-      staffName: "김도윤",
-    },
-  ];
+type FilterType = "전체" | "호출" | "상태변경" | "로그인" | "로그아웃" | "입금확인" | "토큰수정" | "테이블초기화" | "품절처리" | "주문취소" | "메뉴변경";
+
+// 실제 API를 호출할 Fetch 함수 (staffFetch 적용)
+const fetchLogs = async (
+  cursor: number | undefined,
+  filter: FilterType
+): Promise<LogApiResponse> => {
+  const queryParams = new URLSearchParams();
+  
+  // cursor가 존재하면 파라미터에 추가 (첫 요청 시에는 undefined)
+  if (cursor !== undefined) {
+    queryParams.append("cursor", cursor.toString());
+  }
+  
+  // 필터가 적용된 경우 type 파라미터 추가 (API 설계에 따라 생략/수정 가능)
+  if (filter !== "전체") {
+    queryParams.append("type", filter);
+  }
+
+  const queryString = queryParams.toString() ? `?${queryParams.toString()}` : "";
+  const res = await staffFetch(`/api/admin/logs${queryString}`);
+  
+  const result = await res.json();
+  
+  if (!result.success) {
+    throw new Error(result.message || "네트워크 응답이 올바르지 않습니다.");
+  }
+  
+  return result;
+};
+
+export default function StaffLogPage() {
+  const [activeFilter, setActiveFilter] = React.useState<FilterType>("전체");
+  
+  // 무한 스크롤 감지를 위한 옵저버 훅
+  const { ref, inView } = useInView();
 
   const filters: FilterType[] = [
-    "전체",
-    "호출",
-    "상태변경",
-    "로그인",
-    "로그아웃",
-    "입금확인",
-    "토큰수정",
-    "테이블초기화",
-    "품절처리",
-    "주문취소",
-    "메뉴변경",
+    "전체", "호출", "상태변경", "로그인", "로그아웃", "입금확인",
+    "토큰수정", "테이블초기화", "품절처리", "주문취소", "메뉴변경",
   ];
 
-  const filteredLogs = useMemo(() => {
-    const result =
-      activeFilter === "전체"
-        ? logs
-        : logs.filter((log) => log.type === activeFilter);
+  // TanStack Query: 커서 기반 무한 스크롤 적용
+  const {
+    data,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    refetch,
+    isFetching,
+    status
+  } = useInfiniteQuery({
+    queryKey: ["adminLogs", activeFilter],
+    // pageParam이 바로 cursor 값 역할을 합니다.
+    queryFn: ({ pageParam }) => fetchLogs(pageParam as number | undefined, activeFilter),
+    initialPageParam: undefined as number | undefined, // 첫 요청 시 cursor는 없음
+    getNextPageParam: (lastPage) => {
+      // API 응답의 hasNext가 true일 때만 nextCursor를 반환
+      if (lastPage.data.cursor.hasNext) {
+        return lastPage.data.cursor.nextCursor;
+      }
+      return undefined; // undefined를 반환하면 더 이상 데이터를 불러오지 않음
+    },
+  });
 
-    return result.slice().reverse();
-  }, [activeFilter]);
-
-  const getCountByType = (filter: FilterType) => {
-    if (filter === "전체") return logs.length;
-    return logs.filter((log) => log.type === filter).length;
-  };
-
-  const getLogStyle = (type: LogType) => {
-    switch (type) {
-      case "호출":
-        return {
-          card: "bg-cyan-500/10 border-cyan-500/30",
-          badge: "bg-cyan-500/20 text-cyan-400 border-cyan-500/30",
-          iconBox: "bg-cyan-500/20 text-cyan-400",
-        };
-      case "입금확인":
-        return {
-          card: "bg-yellow-500/10 border-yellow-500/30",
-          badge: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
-          iconBox: "bg-yellow-500/20 text-yellow-400",
-        };
-      case "상태변경":
-      case "메뉴변경":
-        return {
-          card: "bg-orange-500/10 border-orange-500/30",
-          badge: "bg-orange-500/20 text-orange-400 border-orange-500/30",
-          iconBox: "bg-orange-500/20 text-orange-400",
-        };
-      case "로그인":
-        return {
-          card: "bg-emerald-500/10 border-emerald-500/30",
-          badge: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
-          iconBox: "bg-emerald-500/20 text-emerald-400",
-        };
-      case "로그아웃":
-        return {
-          card: "bg-slate-500/10 border-slate-500/30",
-          badge: "bg-slate-500/20 text-slate-300 border-slate-500/30",
-          iconBox: "bg-slate-500/20 text-slate-300",
-        };
-      case "토큰수정":
-        return {
-          card: "bg-amber-500/10 border-amber-500/30",
-          badge: "bg-amber-500/20 text-amber-400 border-amber-500/30",
-          iconBox: "bg-amber-500/20 text-amber-400",
-        };
-      case "테이블초기화":
-        return {
-          card: "bg-red-500/10 border-red-500/30",
-          badge: "bg-red-500/20 text-red-400 border-red-500/30",
-          iconBox: "bg-red-500/20 text-red-400",
-        };
-      case "품절처리":
-      case "주문취소":
-        return {
-          card: "bg-purple-500/10 border-purple-500/30",
-          badge: "bg-purple-500/20 text-purple-400 border-purple-500/30",
-          iconBox: "bg-purple-500/20 text-purple-400",
-        };
+  // 스크롤이 맨 아래(ref)에 닿았고, 다음 페이지가 존재하며, 로딩 중이 아닐 때 다음 데이터 호출
+  useEffect(() => {
+    if (inView && hasNextPage && !isFetchingNextPage) {
+      fetchNextPage();
     }
-  };
+  }, [inView, hasNextPage, isFetchingNextPage, fetchNextPage]);
 
-  const getLogIcon = (type: LogType) => {
-    switch (type) {
-      case "호출":
-        return <User size={18} />;
-      case "입금확인":
-        return <CreditCard size={18} />;
-      case "상태변경":
-        return <span className="text-base">🔄</span>;
-      case "로그인":
-        return <User size={18} />;
-      case "로그아웃":
-        return <span className="text-base">↪</span>;
-      case "토큰수정":
-        return <span className="text-base">🪙</span>;
-      case "테이블초기화":
-        return <span className="text-base">↻</span>;
-      case "품절처리":
-        return <span className="text-base">⚠</span>;
-      case "주문취소":
-        return <span className="text-base">✕</span>;
-      case "메뉴변경":
-        return <span className="text-base">☰</span>;
-    }
-  };
+  // 각 페이지(pages) 안에 있는 logs 배열을 1차원 배열로 펼침(flatMap)
+  const logs = useMemo(() => {
+    return data?.pages.flatMap((page) => page.data.logs) || [];
+  }, [data]);
+
+  // UI용 임시 스타일 함수 (응답 action 기반으로 수정 필요)
+  const getLogStyle = (action: string) => { return { card: "" }; };
 
   return (
     <div className="min-h-full bg-[#0f172a] px-3 py-4 sm:px-6 lg:px-10">
       <div className="mx-auto max-w-5xl">
+        
+        {/* 필터 섹션 */}
         <section className="mb-3 rounded-2xl border border-slate-800 bg-[#1e293b]/70 p-3">
           <label className="mb-2 block text-[11px] font-black uppercase tracking-widest text-slate-500">
             기록 유형 선택
           </label>
-
           <select
             value={activeFilter}
             onChange={(e) => setActiveFilter(e.target.value as FilterType)}
@@ -260,102 +124,86 @@ export default function StaffLogPage() {
           >
             {filters.map((filter) => (
               <option key={filter} value={filter}>
-                {filter} {getCountByType(filter)}
+                {filter}
               </option>
             ))}
           </select>
         </section>
 
+        {/* 로그 목록 섹션 */}
         <section className="rounded-3xl border border-slate-800 bg-[#1e293b]/70 p-3 sm:p-5">
           <div className="mb-3 flex items-center justify-between">
             <div>
-              <h2 className="text-base font-black text-white sm:text-xl">
+              <h2 className="text-base font-black text-white sm:text-xl flex items-center gap-2">
                 {activeFilter === "전체" ? "전체 운영 기록" : `${activeFilter} 기록`}
+                
+                {/* 🔄 새로고침 버튼 (클릭 시 refetch 호출) */}
+                <button
+                  onClick={() => refetch()}
+                  disabled={isFetching}
+                  className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors disabled:opacity-50"
+                  title="새로고침"
+                >
+                  <RefreshCw size={16} className={isFetching ? "animate-spin text-orange-500" : ""} />
+                </button>
               </h2>
-
               <p className="mt-1 text-[11px] font-medium text-slate-500 sm:text-xs">
                 최근 발생한 기록이 위에 표시됩니다.
               </p>
             </div>
-
-            <div className="hidden rounded-full border border-slate-700 bg-slate-900 px-3 py-2 text-xs font-black text-slate-400 sm:block">
-              LOG
-            </div>
           </div>
 
-          {filteredLogs.length === 0 ? (
+          {/* 로딩/결과 렌더링 */}
+          {status === "pending" ? (
+            <div className="flex min-h-[200px] flex-col items-center justify-center rounded-2xl border border-dashed border-slate-700 bg-slate-900/50 p-5">
+              <Loader2 className="animate-spin text-orange-500 mb-2" size={24} />
+              <p className="text-sm font-black text-slate-400">데이터를 불러오는 중입니다...</p>
+            </div>
+          ) : status === "error" ? (
+            <div className="flex min-h-[200px] flex-col items-center justify-center rounded-2xl border border-dashed border-red-900/50 bg-red-900/20 p-5">
+              <p className="text-sm font-black text-red-400">데이터를 불러오는 중 오류가 발생했습니다.</p>
+              <button onClick={() => refetch()} className="mt-3 text-xs text-red-300 underline">다시 시도</button>
+            </div>
+          ) : logs.length === 0 ? (
             <div className="flex min-h-[200px] flex-col items-center justify-center rounded-2xl border border-dashed border-slate-700 bg-slate-900/50 p-5 text-center">
-              <p className="text-sm font-black text-slate-400">
-                표시할 기록이 없습니다.
-              </p>
+              <p className="text-sm font-black text-slate-400">표시할 기록이 없습니다.</p>
             </div>
           ) : (
             <div className="space-y-2.5">
-              {filteredLogs.map((log) => {
-                const style = getLogStyle(log.type);
-
+              {logs.map((log) => {
+                const style = getLogStyle(log.action);
                 return (
-                  <article
-                    key={log.id}
-                    className={`rounded-2xl border p-3 transition-all hover:border-white/20 sm:p-4 ${style.card}`}
-                  >
-                    <div className="flex items-start gap-3">
-                      <div
-                        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${style.iconBox}`}
-                      >
-                        {getLogIcon(log.type)}
-                      </div>
-
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <h3 className="text-base font-black leading-tight text-white sm:text-lg">
-                            {log.title}
-                          </h3>
-
-                          <span
-                            className={`rounded-full border px-2 py-0.5 text-[11px] font-black ${style.badge}`}
-                          >
-                            {log.type}
-                          </span>
-                        </div>
-
-                        <p className="mt-2 text-xs font-bold leading-relaxed text-slate-200 sm:text-sm">
-                          {log.description}
-                        </p>
-
-                        <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] font-bold text-slate-400 sm:text-xs">
-                          <Clock size={13} />
-                          <span>{log.time}</span>
-                          <span className="text-slate-600">|</span>
-                          <span>담당자 {log.staffName}</span>
-
-                          {log.tableNumber && (
-                            <>
-                              <span className="text-slate-600">|</span>
-                              <span>{log.tableNumber}번 테이블</span>
-                            </>
-                          )}
-                        </div>
-
-                        {log.detail && (
-                          <div className="mt-3 rounded-xl border border-white/5 bg-black/20 p-2.5">
-                            <p className="mb-1 text-[10px] font-black uppercase tracking-widest text-slate-500">
-                              상세 내용
-                            </p>
-                            <p className="text-xs font-bold leading-relaxed text-slate-100 sm:text-sm">
-                              {log.detail}
-                            </p>
-                          </div>
-                        )}
-                      </div>
+                  // logId를 key로 사용
+                  <article key={log.logId} className={`rounded-2xl border border-slate-700 bg-slate-800 p-3 transition-all hover:border-white/20 sm:p-4 ${style?.card}`}>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-bold text-slate-400 px-2 py-1 bg-slate-900 rounded-md">
+                        {log.category} | {log.action}
+                      </span>
+                      <span className="text-xs text-slate-500">
+                        {new Date(log.createdAt).toLocaleString()}
+                      </span>
                     </div>
+                    <p className="text-sm text-white font-medium break-keep">
+                      {log.message}
+                    </p>
                   </article>
                 );
               })}
+              
+              {/* 무한 스크롤 트리거 요소 */}
+              <div ref={ref} className="h-10 flex items-center justify-center py-4">
+                {isFetchingNextPage ? (
+                  <Loader2 className="animate-spin text-slate-400" size={20} />
+                ) : hasNextPage ? (
+                  <span className="text-xs text-slate-500">스크롤하여 더 보기</span>
+                ) : (
+                  <span className="text-xs text-slate-500">모든 기록을 불러왔습니다.</span>
+                )}
+              </div>
             </div>
           )}
         </section>
       </div>
     </div>
   );
-} 
+}
