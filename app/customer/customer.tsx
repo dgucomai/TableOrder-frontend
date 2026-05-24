@@ -37,7 +37,7 @@ export default function OrderPage() {
   const [currentTokenCount, setCurrentTokenCount] = useState<number>(0); 
   
   const [menuList, setMenuList] = useState<MenuItem[]>([]);
-  const [categories, setCategories] = useState<string[]>([]); // ALL 삭제
+  const [categories, setCategories] = useState<string[]>([]);
   const [activeCategory, setActiveCategory] = useState("");
   
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -125,7 +125,6 @@ export default function OrderPage() {
         
         setMenuList(fetchedMenus);
         
-        // ALL 제거 후 실제 카테고리만 저장
         const uniqueCategories = Array.from(new Set(fetchedMenus.map((m: MenuItem) => m.categoryName))) as string[];
         setCategories(uniqueCategories);
         if (uniqueCategories.length > 0) {
@@ -139,13 +138,23 @@ export default function OrderPage() {
     }
   };
 
+  // --- 모바일 뒤로가기 처리를 위한 History API ---
+  useEffect(() => {
+    const handlePopState = () => {
+      if (selectedMenu) {
+        setSelectedMenu(null); // 뒤로가기 발생 시 모달 닫기
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [selectedMenu]);
+
   // --- 카테고리 스크롤 함수 ---
   const scrollToCategory = (category: string) => {
     setActiveCategory(category);
     const el = categoryRefs.current[category];
     if (el) {
-      // 상단 헤더와 탭 높이를 고려한 여백 적용
-      const y = el.getBoundingClientRect().top + window.scrollY - 120;
+      const y = el.getBoundingClientRect().top + window.scrollY - 100; // 상단 여백 최적화
       window.scrollTo({ top: y, behavior: 'smooth' });
     }
   };
@@ -156,7 +165,6 @@ export default function OrderPage() {
     setCart(prev => {
       const existing = prev.find(i => i.menuId === item.menuId);
       if (existing) {
-        // 기존 담긴 수량과 추가하려는 수량 합산 시 9개를 넘지 못하도록 제한
         const newQuantity = Math.min(9, existing.quantity + qty);
         return prev.map(i => i.menuId === item.menuId ? { ...i, quantity: newQuantity } : i);
       }
@@ -173,18 +181,28 @@ export default function OrderPage() {
     }, [] as CartItem[]));
   };
 
+  // --- 메뉴 상세 모달 열기/닫기 로직 ---
   const openMenuDetail = (item: MenuItem) => {
     if (item.soldOut) return;
     setSelectedMenu(item);
-    
-    // 모달 열 때, 장바구니에 이미 있다면 그 수량에서부터 시작하고 없으면 1로 초기화 (선택사항이나, UX상 보통 1로 둡니다)
     setDetailQuantity(1); 
+    // 열 때 state를 푸시해 두어 모바일에서 뒤로가기가 감지되도록 함
+    window.history.pushState({ modal: 'detail' }, ''); 
+  };
+
+  const closeMenuDetail = () => {
+    // 닫기 버튼을 직접 눌렀을 때, 스택에 쌓인 state를 없애기 위해 뒤로가기를 호출 (자연스레 popstate 이벤트가 발생하여 null 처리됨)
+    if (window.history.state?.modal === 'detail') {
+      window.history.back();
+    } else {
+      setSelectedMenu(null);
+    }
   };
 
   const handleDetailAddToCart = () => {
     if (!selectedMenu) return;
     addToCart(selectedMenu, detailQuantity);
-    setSelectedMenu(null); 
+    closeMenuDetail(); 
   };
 
   const totalQuantity = cart.reduce((sum, item) => sum + item.quantity, 0);
@@ -346,7 +364,8 @@ export default function OrderPage() {
       {step === 'MENU' && (
         <>
           <div className="sticky top-0 z-30 flex flex-col bg-white">
-            <header className="px-4 py-3 flex justify-between items-center shadow-sm">
+            {/* 상단 간격 축소: py-3 -> pt-3 pb-2 */}
+            <header className="px-4 pt-3 pb-2 flex justify-between items-center">
               <div className="min-w-0 flex-1 mr-2">
                 <h1 className="text-lg font-extrabold text-orange-600 tracking-tight whitespace-nowrap truncate">CAISINO ORDER</h1>
                 <div className="flex items-center gap-2 mt-0.5">
@@ -370,8 +389,8 @@ export default function OrderPage() {
               </div>
             </header>
             
-            {/* 카테고리 탭 (스크롤 네비게이션 역할) */}
-            <div className="flex gap-2 overflow-x-auto px-4 py-3 border-b border-gray-100 scrollbar-hide bg-white">
+            {/* 카테고리 탭 상단 간격 축소: py-3 -> pt-1 pb-3 */}
+            <div className="flex gap-2 overflow-x-auto px-4 pt-1 pb-3 border-b border-gray-100 scrollbar-hide bg-white shadow-sm">
               {categories.map(cat => (
                 <button 
                   key={cat} 
@@ -400,11 +419,11 @@ export default function OrderPage() {
                       key={category} 
                       ref={el => { categoryRefs.current[category] = el; }} 
                     >
-                      {/* 카테고리 사이 굵은 회색 갭 라인 추가 */}
                       {index > 0 && <div className="h-3 w-full bg-gray-100 border-y border-gray-200/60" />}
                       
                       <div className="pt-6">
-                        <h2 className="px-4 text-xl font-extrabold text-gray-900 mb-2">{category}</h2>
+                        {/* 카테고리 제목 폰트 크기 증가: text-xl -> text-2xl */}
+                        <h2 className="px-4 text-2xl font-extrabold text-gray-900 mb-2">{category}</h2>
                         <div className="flex flex-col">
                           {categoryMenus.map(item => {
                             const cartItem = cart.find(i => i.menuId === item.menuId);
@@ -413,18 +432,22 @@ export default function OrderPage() {
                               <div 
                                 key={item.menuId} 
                                 onClick={() => openMenuDetail(item)}
-                                className={`flex gap-4 p-4 border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors ${item.soldOut ? "opacity-50 pointer-events-none" : ""}`}
+                                // 담긴 메뉴 하이라이트 (bg-orange-50/50 적용)
+                                className={`flex gap-4 p-4 border-b cursor-pointer transition-colors ${
+                                  item.soldOut ? "opacity-60 pointer-events-none" : ""
+                                } ${
+                                  cartItem ? "bg-orange-50/50 border-orange-100" : "bg-white border-gray-100 hover:bg-gray-50"
+                                }`}
                               >
                                 <div className="flex-1 flex flex-col py-0.5 min-w-0">
                                   <div className="min-w-0 mb-1">
                                     <div className="flex items-start gap-2">
                                       <h3 className="font-bold text-[17px] text-gray-900 leading-tight truncate">{item.menuName}</h3>
-                                      {item.soldOut && <span className="text-[10px] bg-red-100 text-red-600 px-2 py-0.5 rounded font-bold whitespace-nowrap shrink-0 mt-0.5">품절</span>}
+                                      {/* 이름 옆에 있던 품절 배지 제거됨 */}
                                     </div>
                                     <p className="text-sm text-gray-400 mt-1 truncate">{item.description}</p>
                                   </div>
                                   
-                                  {/* 가격 & 카트 컨트롤 영역 */}
                                   <div className="flex justify-between items-end mt-auto min-h-[32px]">
                                     <div className="flex items-center gap-1.5 whitespace-nowrap pb-1">
                                       <span className="font-bold text-gray-900 text-base">{item.price.toLocaleString()}원</span>
@@ -433,15 +456,14 @@ export default function OrderPage() {
                                       </span>
                                     </div>
 
-                                    {/* 장바구니에 담긴 아이템일 때만 우측에 수량 조절 버튼 노출 */}
                                     {cartItem && !item.soldOut && (
                                       <div 
-                                        className="flex items-center bg-white rounded-lg border border-gray-200 shadow-sm shrink-0 h-8" 
-                                        onClick={(e) => e.stopPropagation()} // 모달 오픈 방지
+                                        className="flex items-center bg-white rounded-lg border border-orange-200 shadow-sm shrink-0 h-8" 
+                                        onClick={(e) => e.stopPropagation()} 
                                       >
                                         <button 
                                           onClick={() => removeFromCart(item.menuId)} 
-                                          className="w-8 h-full flex items-center justify-center text-gray-700 hover:bg-gray-50 rounded-l-lg transition-colors"
+                                          className="w-8 h-full flex items-center justify-center text-gray-700 hover:bg-orange-50 rounded-l-lg transition-colors"
                                         >
                                           <Minus size={14} strokeWidth={3} />
                                         </button>
@@ -451,7 +473,7 @@ export default function OrderPage() {
                                         <button 
                                           onClick={() => addToCart(item, 1)} 
                                           disabled={cartItem.quantity >= 9}
-                                          className="w-8 h-full flex items-center justify-center text-gray-700 hover:bg-gray-50 rounded-r-lg disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+                                          className="w-8 h-full flex items-center justify-center text-gray-700 hover:bg-orange-50 rounded-r-lg disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
                                         >
                                           <Plus size={14} strokeWidth={3} />
                                         </button>
@@ -460,11 +482,34 @@ export default function OrderPage() {
                                   </div>
                                 </div>
                                 
-                                {item.imageUrl ? (
-                                  <img src={item.imageUrl} alt={item.menuName} className="w-24 h-24 rounded-xl object-cover shrink-0 bg-gray-100 border border-black/5" />
-                                ) : (
-                                  <div className="w-24 h-24 rounded-xl shrink-0 bg-gray-200 flex items-center justify-center text-xs text-gray-400 whitespace-nowrap">No Image</div>
-                                )}
+                                {/* 음식 이미지 영역을 relative로 설정 */}
+                                <div className="relative w-24 h-24 shrink-0">
+                                  {item.imageUrl ? (
+                                    <img src={item.imageUrl} alt={item.menuName} className="w-full h-full rounded-xl object-cover bg-gray-100 border border-black/5" />
+                                  ) : (
+                                    <div className="w-full h-full rounded-xl bg-gray-200 flex items-center justify-center text-xs text-gray-400 whitespace-nowrap">No Image</div>
+                                  )}
+                                  
+                                  {/* 품절 시 음식 이미지 정가운데에 배치되는 오버레이 */}
+                                  {item.soldOut && (
+                                    <div className="absolute inset-0 bg-black/40 rounded-xl flex items-center justify-center backdrop-blur-[1px]">
+                                      <span className="bg-red-600 text-white text-xs font-black px-2.5 py-1 rounded shadow-sm tracking-widest">품절</span>
+                                    </div>
+                                  )}
+
+                                  {/* 장바구니에 없고 품절이 아닐 때, 이미지 우측 하단의 동그란 + 버튼 */}
+                                  {!cartItem && !item.soldOut && (
+                                    <button 
+                                      onClick={(e) => {
+                                        e.stopPropagation(); 
+                                        addToCart(item, 1);
+                                      }}
+                                      className="absolute -bottom-2 -right-2 w-8 h-8 bg-white text-orange-500 rounded-full flex items-center justify-center shadow-md border border-gray-100 hover:bg-orange-50 active:scale-95 transition-all z-10"
+                                    >
+                                      <Plus size={20} strokeWidth={3} />
+                                    </button>
+                                  )}
+                                </div>
                               </div>
                             );
                           })}
@@ -489,14 +534,13 @@ export default function OrderPage() {
       {selectedMenu && (
         <div className="fixed inset-0 z-[70] bg-white flex flex-col animate-in slide-in-from-bottom-4 duration-200">
           <button 
-            onClick={() => setSelectedMenu(null)} 
+            onClick={closeMenuDetail} 
             className="absolute top-4 left-4 z-10 p-2 bg-white/80 backdrop-blur-md rounded-full shadow-sm text-gray-900 hover:bg-white"
           >
             <ChevronLeft size={24} />
           </button>
 
           <div className="flex-1 overflow-y-auto pb-32">
-            {/* 큰 이미지: 4:3 비율(가로로 살짝 긴 형태)로 크롭하여 렌더링 */}
             {selectedMenu.imageUrl ? (
               <img src={selectedMenu.imageUrl} alt={selectedMenu.menuName} className="w-full aspect-[4/3] object-cover bg-gray-100" />
             ) : (
