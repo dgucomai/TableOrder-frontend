@@ -31,9 +31,10 @@ const CALL_PRESETS = [
 const API_BASE_URL = "/api";
 
 export default function OrderPage() {
-  // 상태 변수는 'qrToken'으로 통일하여 사용합니다.
   const [qrToken, setQrToken] = useState<string | null>(null);
   const [displayTableNum, setDisplayTableNum] = useState<string | null>(null);
+  const [tableId, setTableId] = useState<number | null>(null); // 🪙 테이블 ID 상태 추가
+  const [currentTokenCount, setCurrentTokenCount] = useState<number>(0); // 🪙 현재 보유 토큰 상태 추가
   
   const [menuList, setMenuList] = useState<MenuItem[]>([]);
   const [categories, setCategories] = useState<string[]>(["All"]);
@@ -50,13 +51,30 @@ export default function OrderPage() {
   const [customCallText, setCustomCallText] = useState("");
   const [isCallLoading, setIsCallLoading] = useState(false);
 
+  // 🪙 메뉴 가격 비례 토큰 계산 로직 (1000원당 1개)
+  const calculateTokens = (price: number) => {
+    return Math.round(price / 1000);
+  };
+
+  // 🪙 테이블 보유 토큰 조회 API 호출 함수
+  const fetchTokenCount = async (id: number) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/tokens/${id}`);
+      const result = await response.json();
+      
+      if (result.success && result.data) {
+        setCurrentTokenCount(result.data.tokenCount);
+      }
+    } catch (error) {
+      console.error("토큰 수량 로딩 에러:", error);
+    }
+  };
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    // Nginx를 통과한 토큰 가져오기 (초기 로딩 시 파싱되는 값)
     const initialToken = params.get("qt") || "";
     setQrToken(initialToken);
 
-    // --- [GET] DB와 통신하여 유효한 토큰인지 확인하고 테이블 번호 로딩 ---
     const loadTableAndMenus = async (tokenString: string) => {
       if (!tokenString) {
         setStep('ACCESS_DENIED');
@@ -64,16 +82,24 @@ export default function OrderPage() {
       }
 
       try {
-        // 백엔드 API 명세(?qt=)에 맞춰 통신
         const response = await fetch(`${API_BASE_URL}/qtnum?qt=${tokenString}`);
         const result = await response.json();
 
         if (result.success && result.data && result.data.tableNumber) {
           setDisplayTableNum(result.data.tableNumber.toString());
-          await fetchMenus();
+          
+          // API 응답에 tableId가 있다면 사용하고, 없다면 tableNumber를 fallback으로 사용
+          const fetchedTableId = result.data.tableId || result.data.tableNumber;
+          setTableId(fetchedTableId);
+
+          // 메뉴 데이터와 토큰 데이터를 병렬로 로딩
+          await Promise.all([
+            fetchMenus(),
+            fetchTokenCount(fetchedTableId)
+          ]);
+          
           setStep('MENU'); 
         } else {
-          // DB에 없는 가짜 토큰이거나 만료된 토큰일 경우 튕겨냄
           setStep('ACCESS_DENIED');
         }
       } catch (error) {
@@ -91,7 +117,11 @@ export default function OrderPage() {
       const result = await response.json();
 
       if (result.success) {
-        const fetchedMenus = result.data.menus;
+        const fetchedMenus = result.data.menus.map((m: any) => ({
+          ...m,
+          soldOut: m.isSoldOut !== undefined ? m.isSoldOut : m.soldOut
+        }));
+        
         setMenuList(fetchedMenus);
         const uniqueCategories = Array.from(new Set(fetchedMenus.map((m: MenuItem) => m.categoryName))) as string[];
         setCategories(["All", ...uniqueCategories]);
@@ -127,6 +157,7 @@ export default function OrderPage() {
 
   const totalQuantity = cart.reduce((sum, item) => sum + item.quantity, 0);
   const totalPrice = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  const totalTokens = cart.reduce((sum, item) => sum + (calculateTokens(item.price) * item.quantity), 0);
 
   const handleCheckoutReady = () => {
     if (!qrToken) {
@@ -246,16 +277,21 @@ export default function OrderPage() {
             <header className="px-4 py-3 flex justify-between items-center shadow-sm">
               <div>
                 <h1 className="text-lg font-extrabold text-orange-600 tracking-tight">CAISINO ORDER</h1>
-                <p className="text-xs font-bold text-gray-700">
-                  {displayTableNum}번 테이블
-                </p>
+                {/* 🪙 상단 타이틀 아래에 테이블 번호와 함께 보유 토큰 표시 */}
+                <div className="flex items-center gap-2 mt-0.5">
+                  <p className="text-xs font-bold text-gray-700">
+                    {displayTableNum}번 테이블
+                  </p>
+                  <span className="text-[10px] bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded-md font-bold">
+                    보유 🪙 {currentTokenCount}개
+                  </span>
+                </div>
               </div>
               <div className="flex items-center gap-1">
                 <button onClick={() => setIsCallModalOpen(true)} className="p-2 text-orange-600 hover:bg-orange-50 rounded-full transition-colors flex flex-col items-center justify-center">
                   <BellRing className="w-6 h-6" />
                   <span className="text-[10px] font-bold mt-0.5">호출</span>
                 </button>
-                {/* 🚨 기존 에러 수정됨: token -> qrToken */}
                 <Link href={`/customer/orders?qt=${qrToken || ""}`} className="p-2 text-gray-700 hover:bg-gray-100 rounded-full transition-colors">
                   <ReceiptText className="w-6 h-6" />
                   <span className="text-[10px] font-bold mt-0.5"> 내역</span>
@@ -301,7 +337,12 @@ export default function OrderPage() {
                           <p className="text-xs text-gray-400 mt-1 line-clamp-2">{item.description}</p>
                         </div>
                         <div className="flex justify-between items-end mt-2">
-                          <span className="font-bold text-gray-900">{item.price.toLocaleString()}원</span>
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-gray-900">{item.price.toLocaleString()}원</span>
+                            <span className="text-[10px] bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded-md font-bold">
+                              🪙 {calculateTokens(item.price)}개
+                            </span>
+                          </div>
                           
                           {!item.soldOut && (
                             cartItem ? (
@@ -337,7 +378,12 @@ export default function OrderPage() {
             <h2 className="text-2xl text-black font-black mb-6">입금 정보를 확인해주세요</h2>
             <div className="space-y-4 mb-8">
               <div className="bg-gray-50 p-5 rounded-2xl border">
-                <p className="text-gray-500 text-sm mb-1">총 입금액</p>
+                <div className="flex justify-between items-end mb-1">
+                  <p className="text-gray-500 text-sm">총 입금액</p>
+                  <p className="text-orange-600 text-sm font-bold bg-orange-100 px-2 py-0.5 rounded-lg">
+                    주문 완료시 🪙 {totalTokens}개 획득
+                  </p>
+                </div>
                 <p className="text-3xl font-black text-orange-600">{totalPrice.toLocaleString()}원</p>
               </div>
               <div className="bg-gray-50 p-5 rounded-2xl border">
@@ -395,7 +441,10 @@ export default function OrderPage() {
           <button onClick={() => setIsCartOpen(true)} className="w-full bg-orange-500 text-white shadow-xl rounded-2xl p-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="bg-white text-orange-500 w-8 h-8 rounded-full flex items-center justify-center font-bold">{totalQuantity}</div>
-              <span className="font-semibold text-lg">{totalPrice.toLocaleString()}원</span>
+              <div className="flex flex-col items-start">
+                <span className="font-semibold text-lg leading-tight">{totalPrice.toLocaleString()}원</span>
+                <span className="text-xs font-medium text-orange-100 opacity-90">예상 획득: 🪙 {totalTokens}개</span>
+              </div>
             </div>
             <div className="flex items-center font-bold text-lg">장바구니 보기 <ChevronRight size={20} className="ml-1" /></div>
           </button>
@@ -408,12 +457,20 @@ export default function OrderPage() {
           <div className="bg-white w-full rounded-t-3xl max-h-[85vh] flex flex-col p-5">
             <div className="flex justify-between items-center mb-5">
               <h2 className="text-xl text-gray-900 font-bold">장바구니</h2>
-              <button onClick={() => setIsCartOpen(false)} className="p-2 bg-orange-500 rounded-full"><X size={20} /></button>
+              <button onClick={() => setIsCartOpen(false)} className="p-2 bg-orange-500 rounded-full text-white"><X size={20} /></button>
             </div>
             <div className="overflow-y-auto space-y-5 mb-5">
               {cart.map(item => (
                 <div key={item.menuId} className="flex justify-between items-center">
-                  <div className="flex-1"><h4 className="text-black font-bold">{item.menuName}</h4><p className="text-sm text-gray-500">{item.price.toLocaleString()}원</p></div>
+                  <div className="flex-1">
+                    <h4 className="text-black font-bold">{item.menuName}</h4>
+                    <div className="flex items-center gap-2 mt-1">
+                      <p className="text-sm text-gray-500">{item.price.toLocaleString()}원</p>
+                      <span className="text-[10px] bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded-md font-bold">
+                        🪙 {calculateTokens(item.price)}개
+                      </span>
+                    </div>
+                  </div>
                   <div className="flex items-center bg-gray-50 rounded-lg border ml-4">
                     <button onClick={() => removeFromCart(item.menuId)} className="p-2 text-gray-700"><Minus size={16} /></button>
                     <span className="w-8 text-center text-gray-900 font-bold">{item.quantity}</span>
@@ -423,8 +480,11 @@ export default function OrderPage() {
               ))}
             </div>
             <div className="border-t pt-5 pb-8">
-              <div className="flex justify-between items-center mb-4">
-                <span className="text-gray-500 font-medium">총 결제금액</span>
+              <div className="flex justify-between items-end mb-4">
+                <div className="flex flex-col">
+                  <span className="text-gray-500 font-medium">총 결제금액</span>
+                  <span className="text-xs text-orange-600 font-bold mt-1">🪙 총 {totalTokens}개 획득 예정</span>
+                </div>
                 <span className="text-2xl text-black font-bold">{totalPrice.toLocaleString()}원</span>
               </div>
               <button onClick={handleCheckoutReady} className="w-full py-4 bg-gray-900 text-white rounded-xl font-bold text-lg">결제하기</button>
@@ -442,7 +502,7 @@ export default function OrderPage() {
                 <BellRing className="text-orange-600" size={24} />
                 직원 호출
               </h2>
-              <button onClick={() => setIsCallModalOpen(false)} className="p-2 bg-orange-500 hover:bg-gray-200 rounded-full transition-colors">
+              <button onClick={() => setIsCallModalOpen(false)} className="p-2 bg-orange-500 text-white hover:bg-orange-600 rounded-full transition-colors">
                 <X size={20} />
               </button>
             </div>
