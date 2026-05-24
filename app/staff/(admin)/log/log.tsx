@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useMemo, useEffect } from "react";
-import { Clock, CreditCard, User, RefreshCw, Loader2 } from "lucide-react";
+import { RefreshCw, Loader2 } from "lucide-react";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { useInView } from "react-intersection-observer";
 import { staffFetch } from "@/lib/staffFetch"; // JWT가 적용된 fetch 유틸리티
@@ -28,23 +28,15 @@ interface LogApiResponse {
   message: string | null;
 }
 
-type FilterType = "전체" | "호출" | "상태변경" | "로그인" | "로그아웃" | "입금확인" | "토큰수정" | "테이블초기화" | "품절처리" | "주문취소" | "메뉴변경";
-
 // 실제 API를 호출할 Fetch 함수 (staffFetch 적용)
 const fetchLogs = async (
-  cursor: number | undefined,
-  filter: FilterType
+  cursor: number | undefined
 ): Promise<LogApiResponse> => {
   const queryParams = new URLSearchParams();
   
   // cursor가 존재하면 파라미터에 추가 (첫 요청 시에는 undefined)
   if (cursor !== undefined) {
     queryParams.append("cursor", cursor.toString());
-  }
-  
-  // 필터가 적용된 경우 type 파라미터 추가 (API 설계에 따라 생략/수정 가능)
-  if (filter !== "전체") {
-    queryParams.append("type", filter);
   }
 
   const queryString = queryParams.toString() ? `?${queryParams.toString()}` : "";
@@ -60,17 +52,10 @@ const fetchLogs = async (
 };
 
 export default function StaffLogPage() {
-  const [activeFilter, setActiveFilter] = React.useState<FilterType>("전체");
-  
   // 무한 스크롤 감지를 위한 옵저버 훅
   const { ref, inView } = useInView();
 
-  const filters: FilterType[] = [
-    "전체", "호출", "상태변경", "로그인", "로그아웃", "입금확인",
-    "토큰수정", "테이블초기화", "품절처리", "주문취소", "메뉴변경",
-  ];
-
-  // TanStack Query: 커서 기반 무한 스크롤 적용
+  // TanStack Query: 커서 기반 무한 스크롤 적용 (필터 관련 의존성 제거)
   const {
     data,
     fetchNextPage,
@@ -80,9 +65,9 @@ export default function StaffLogPage() {
     isFetching,
     status
   } = useInfiniteQuery({
-    queryKey: ["adminLogs", activeFilter],
+    queryKey: ["adminLogs"],
     // pageParam이 바로 cursor 값 역할을 합니다.
-    queryFn: ({ pageParam }) => fetchLogs(pageParam as number | undefined, activeFilter),
+    queryFn: ({ pageParam }) => fetchLogs(pageParam as number | undefined),
     initialPageParam: undefined as number | undefined, // 첫 요청 시 cursor는 없음
     getNextPageParam: (lastPage) => {
       // API 응답의 hasNext가 true일 때만 nextCursor를 반환
@@ -112,30 +97,12 @@ export default function StaffLogPage() {
     <div className="min-h-full bg-[#0f172a] px-3 py-4 sm:px-6 lg:px-10">
       <div className="mx-auto max-w-5xl">
         
-        {/* 필터 섹션 */}
-        <section className="mb-3 rounded-2xl border border-slate-800 bg-[#1e293b]/70 p-3">
-          <label className="mb-2 block text-[11px] font-black uppercase tracking-widest text-slate-500">
-            기록 유형 선택
-          </label>
-          <select
-            value={activeFilter}
-            onChange={(e) => setActiveFilter(e.target.value as FilterType)}
-            className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2.5 text-sm font-black text-white outline-none transition focus:border-orange-500"
-          >
-            {filters.map((filter) => (
-              <option key={filter} value={filter}>
-                {filter}
-              </option>
-            ))}
-          </select>
-        </section>
-
         {/* 로그 목록 섹션 */}
         <section className="rounded-3xl border border-slate-800 bg-[#1e293b]/70 p-3 sm:p-5">
           <div className="mb-3 flex items-center justify-between">
             <div>
               <h2 className="text-base font-black text-white sm:text-xl flex items-center gap-2">
-                {activeFilter === "전체" ? "전체 운영 기록" : `${activeFilter} 기록`}
+                전체 운영 기록
                 
                 {/* 🔄 새로고침 버튼 (클릭 시 refetch 호출) */}
                 <button
