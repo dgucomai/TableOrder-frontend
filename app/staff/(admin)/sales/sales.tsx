@@ -106,7 +106,7 @@ export default function SalesReport() {
                   <span>시작</span>
                   <div className="flex gap-1">
                     <Target size={16} className="text-orange-500" />
-                    <span>목표 5,000,000원</span>
+                    <span>목표 {GOAL_AMOUNT.toLocaleString()}원</span>
                   </div>
                 </div>
                 
@@ -133,10 +133,10 @@ export default function SalesReport() {
                 {/* 구간 표시 텍스트 */}
                 <div className="grid grid-cols-5 text-[10px] md:text-xs font-black text-slate-600 px-1">
                   <div className="text-left">0</div>
-                  <div className="text-center">100</div>
-                  <div className="text-center">200</div>
-                  <div className="text-center">300</div>
-                  <div className="text-center">400</div>
+                  <div className="text-center">{(STEP_UNIT * 1).toLocaleString()}</div>
+                  <div className="text-center">{(STEP_UNIT * 2).toLocaleString()}</div>
+                  <div className="text-center">{(STEP_UNIT * 3).toLocaleString()}</div>
+                  <div className="text-center">{(STEP_UNIT * 4).toLocaleString()}</div>
                 </div>
               </div>
             </div>
@@ -181,20 +181,23 @@ export default function SalesReport() {
               <Award size={16} /> 100만 원 단위 업그레이드 구간
             </h3>
             <div className="flex flex-wrap gap-3">
-              {[1, 2, 3, 4, 5].map((lvl) => (
-                <div 
-                  key={lvl}
-                  className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold border transition-all ${
-                    currentLevel >= lvl 
-                      ? "border-orange-500/50 bg-orange-500/10 text-orange-400" 
-                      : "border-slate-800 bg-slate-800/20 text-slate-600"
-                  }`}
-                >
-                  <span className={`h-2 w-2 rounded-full ${currentLevel >= lvl ? "bg-orange-500" : "bg-slate-700"}`} />
-                  Level {lvl}: {lvl}00만원 달성
-                  {currentLevel >= lvl && <CheckCircle2 size={12} />}
-                </div>
-              ))}
+              {[1, 2, 3, 4, 5].map((lvl) => {
+                const levelAmount = lvl * STEP_UNIT;
+                return (
+                  <div 
+                    key={lvl}
+                    className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold border transition-all ${
+                      currentLevel >= lvl 
+                        ? "border-orange-500/50 bg-orange-500/10 text-orange-400" 
+                        : "border-slate-800 bg-slate-800/20 text-slate-600"
+                    }`}
+                  >
+                    <span className={`h-2 w-2 rounded-full ${currentLevel >= lvl ? "bg-orange-500" : "bg-slate-700"}`} />
+                    Level {lvl}: {levelAmount.toLocaleString()}원 달성
+                    {currentLevel >= lvl && <CheckCircle2 size={12} />}
+                  </div>
+                );
+              })}
             </div>
           </section>
         </main>
