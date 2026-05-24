@@ -59,6 +59,20 @@ const getStatusConfig = (status: OrderStatus) => {
         bg: "bg-green-100", 
         icon: <CheckCircle2 size={16} /> 
       };
+    case 'REJECTED':
+      return { 
+        text: "주문 거절", 
+        color: "text-pink-500", 
+        bg: "bg-pink-100", 
+        icon: <AlertCircle size={16} /> 
+      };
+    case 'CANCLLED':
+      return { 
+        text: "주문 취소", 
+        color: "text-pink-500", 
+        bg: "bg-pink-100", 
+        icon: <AlertCircle size={16} /> 
+      };
     default:
       return { 
         text: `상태 오류 (${normalizedStatus})`, 
