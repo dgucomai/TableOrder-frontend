@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { staffFetch } from "@/lib/staffFetch";
+import { useSseEvent } from "@/lib/SseContext";
 import { X, Coins, Clock, Check, AlertTriangle, Timer, CreditCard, RotateCcw, Trash2, MessageSquare } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -155,6 +156,40 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
     if (tableId) fetchTableDetail();
     return () => clearInterval(timer);
   }, [tableId]);
+
+  // SSE 이벤트 구독 — 현재 팝업의 tableId에 해당하는 이벤트만 처리
+  useSseEvent("PAYMENT_REQUEST_CREATED", ({ tableId: id }: any) => {
+    if (id === tableId) fetchTableDetail();
+  });
+  useSseEvent("ORDER_APPROVED", ({ tableId: id, orderId }: any) => {
+    if (id !== tableId) return;
+    setOrders((prev) => prev.map((o) =>
+      o.orderId === orderId
+        ? { ...o, orderStatus: "준비 중", itemStatus: "준비 중" }
+        : o
+    ));
+  });
+  useSseEvent("ORDER_REJECTED", ({ tableId: id, orderId }: any) => {
+    if (id !== tableId) return;
+    setOrders((prev) => prev.filter((o) => o.orderId !== orderId));
+  });
+  useSseEvent("ORDER_STATUS_CHANGED", ({ tableId: id, orderId, status }: any) => {
+    if (id !== tableId) return;
+    const mapped = mapOrderStatus(status) as Order["orderStatus"];
+    setOrders((prev) => prev.map((o) =>
+      o.orderId === orderId ? { ...o, orderStatus: mapped } : o
+    ));
+  });
+  useSseEvent("CALL_RESOLVED", ({ tableId: id, callId }: any) => {
+    if (id !== tableId) return;
+    setActiveCalls((prev) => prev.filter((c) => c.callId !== callId));
+  });
+  useSseEvent("TABLE_STATUS_CHANGED", ({ tableId: id }: any) => {
+    if (id === tableId) fetchTableDetail();
+  });
+  useSseEvent("TOKEN_UPDATED", ({ tableId: id, tokenCount }: any) => {
+    if (id === tableId) setTokens(tokenCount);
+  });
 
   const usageTime = useMemo(() => {
     if (!startedAt) return "0분";

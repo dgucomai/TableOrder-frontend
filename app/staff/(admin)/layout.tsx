@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { Menu, X, LogOut, User } from "lucide-react";
+import { SseProvider } from "@/lib/SseContext";
 
 export default function StaffLayout({ children }: { children: React.ReactNode }) {
   const [adminName, setAdminName] = useState("");
@@ -61,6 +62,7 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
   if (!isMounted) return <div className="min-h-screen bg-[#0f172a]" />;
 
   return (
+    <SseProvider>
     <div className="min-h-[100dvh] bg-[#0f172a] text-white flex flex-col">
       {/* 네비게이션 바 */}
       <nav className="h-16 border-b border-slate-800 bg-[#1e293b] flex items-center justify-between px-4 md:px-6 sticky top-0 z-[100]">
@@ -155,5 +157,6 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
         {children}
       </main>
     </div>
+    </SseProvider>
   );
 }

@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import { staffFetch } from "@/lib/staffFetch";
+import { useSseEvent } from "@/lib/SseContext";
 // TableDetailPopup 내부에서 상세 조회(GET /api/staff/tables/{tableId}) API를 호출하도록 구현되어야 합니다.
 import TableDetailPopup from "@/components/TableDetailPopup";
 
@@ -13,6 +14,17 @@ interface TableData {
   id: number; //API에서 내려주는 고유 테이블 ID
   number: number; // 테이블 번호 화면표시용
   status: string; // 매핑된 프론트엔드용 상태값 (empty, active, deposit, staff, dealer)
+}
+
+function mapBackendStatusToFrontend(backendStatus: BackendTableStatus): string {
+  switch (backendStatus) {
+    case "EMPTY": return "empty";
+    case "IN_USE": return "active";
+    case "PAYMENT_PENDING": return "deposit";
+    case "STAFF_CALL": return "staff";
+    case "DEALER_CALL": return "dealer";
+    default: return "empty";
+  }
 }
 
 export default function AdminHomePage() {
@@ -36,92 +48,52 @@ export default function AdminHomePage() {
     dealer: { color: "bg-purple-500/30 border-purple-500 text-white animate-pulse shadow-[0_0_20px_rgba(168,85,247,0.5)]", label: "딜러 호출", icon: "🃏" },
   };
 
-  // 백엔드 상태(tableStatus)를 프론트 UI(statusConfig 키)로 변환해주는 헬퍼 함수
-  const mapBackendStatusToFrontend = (backendStatus: BackendTableStatus): string => {
-    switch (backendStatus) {
-      case "EMPTY": return "empty";
-      case "IN_USE": return "active";
-      case "PAYMENT_PENDING": return "deposit";
-      case "STAFF_CALL": return "staff";
-      case "DEALER_CALL": return "dealer";
-      default: return "empty";
-    }
-  };
-
   // [API 연동 2] 초기 상태는 빈 배열로 시작 (로딩 중 표시를 추가해도 좋습니다)
   const [tables, setTables] = useState<TableData[]>([]);
 
-  // [API 연동 3] 초기 데이터 Fetch 및 SSE 연결 (컴포넌트 마운트 시 1회 실행)
-  useEffect(() => {
-    // 임시: 로컬 스토리지 등에서 JWT 토큰을 가져온다고 가정
-    const token = localStorage.getItem("accessToken") || "";
-
-    const fetchInitialTables = async () => {
-      try {
-        const response = await staffFetch("/api/staff/tables", {
-          method: "GET",
-          headers: { "Content-Type": "application/json" },
-        });
-
-        if (response.status === 403) {
-          alert("직원 권한이 필요합니다.");
-          window.location.href = "/staff";
-          return;
-        }
-
-        const result = await response.json();
-        // result 자체가 아닌 result.data가 배열인지 확인하도록 수정
-        if (result.success && Array.isArray(result.data)) {
-          const formattedTables = result.data.map((t: any) => ({
-            id: t.tableId, 
-            number: t.tableNumber,
-            status: mapBackendStatusToFrontend(t.status) 
-          }));
-          setTables(formattedTables);
-        }
-      } catch (error) {
-        console.error("초기 테이블 현황 조회 실패:", error);
+  // [API 연동 3] 테이블 목록 조회
+  const fetchInitialTables = useCallback(async () => {
+    try {
+      const response = await staffFetch("/api/staff/tables", {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
+      });
+      if (response.status === 403) {
+        alert("직원 권한이 필요합니다.");
+        window.location.href = "/staff";
+        return;
       }
-    };
-
-    fetchInitialTables();
-
-    // ==========================================
-    // [API 연동 4] SSE (Server-Sent Events) 연결
-    // ==========================================
-    const eventSource = new EventSource(`/api/staff/sse?token=${token}`);
-
-    // 범용 메시지 수신
-    eventSource.onmessage = (event) => {
-      try {
-        const parsedData = JSON.parse(event.data);
-        
-        // SSE 이벤트에 table 정보가 변경된 단일 데이터로 넘어온다고 명세에 정의됨
-        if (parsedData && parsedData.table) {
-          const { tableId, tableStatus } = parsedData.table;
-          
-          // 해당 tableId를 가진 테이블의 상태만 업데이트하여 리렌더링 유발
-          setTables((prevTables) =>
-            prevTables.map((t) =>
-              t.id === tableId
-                ? { ...t, status: mapBackendStatusToFrontend(tableStatus) }
-                : t
-            )
-          );
-        }
-      } catch (error) {
-        console.error("SSE 데이터 파싱 에러:", error);
+      const result = await response.json();
+      if (result.success && Array.isArray(result.data)) {
+        setTables(result.data.map((t: any) => ({
+          id: t.tableId,
+          number: t.tableNumber,
+          status: mapBackendStatusToFrontend(t.status),
+        })));
       }
-    };
-
-    eventSource.onerror = () => {
-      console.warn("SSE 연결이 끊어졌거나 에러가 발생했습니다. 재동기화 시도 중...");
-    };
-
-    return () => {
-      eventSource.close();
-    };
+    } catch (error) {
+      console.error("초기 테이블 현황 조회 실패:", error);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchInitialTables();
+  }, [fetchInitialTables]);
+
+  // [API 연동 4] SSE 이벤트 구독 (연결은 SseProvider가 layout에서 관리)
+  useSseEvent("PAYMENT_REQUEST_CREATED", ({ tableId }: any) =>
+    setTables((prev) => prev.map((t) => t.id === tableId ? { ...t, status: "deposit" } : t))
+  );
+  useSseEvent("STAFF_CALL_CREATED", ({ tableId }: any) =>
+    setTables((prev) => prev.map((t) => t.id === tableId ? { ...t, status: "staff" } : t))
+  );
+  useSseEvent("DEALER_CALL_CREATED", ({ tableId }: any) =>
+    setTables((prev) => prev.map((t) => t.id === tableId ? { ...t, status: "dealer" } : t))
+  );
+  useSseEvent("ORDER_APPROVED", fetchInitialTables);
+  useSseEvent("ORDER_REJECTED", fetchInitialTables);
+  useSseEvent("CALL_RESOLVED", fetchInitialTables);
+  useSseEvent("TABLE_STATUS_CHANGED", fetchInitialTables);
 
   // --- 기존의 데스크탑 전용 휠/터치 마우스 이벤트 핸들러 ---
   useEffect(() => {
