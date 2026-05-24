@@ -159,11 +159,52 @@ export default function OrderPage() {
   const totalPrice = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   const totalTokens = cart.reduce((sum, item) => sum + (calculateTokens(item.price) * item.quantity), 0);
 
-  const handleCheckoutReady = () => {
+  const handleCheckoutReady = async () => {
     if (!qrToken) {
       alert("유효하지 않은 주문입니다.");
       return;
     }
+
+    try {
+      // 1. 결제창으로 넘어가기 전 최신 메뉴 상태를 서버에서 다시 불러옵니다.
+      const response = await fetch(`${API_BASE_URL}/menus`);
+      const result = await response.json();
+
+      if (result.success) {
+        const latestMenus = result.data.menus;
+
+        // 2. 현재 장바구니에 있는 아이템과 최신 메뉴 데이터를 비교하여 품절된 메뉴를 찾습니다.
+        const soldOutItemsInCart = cart.filter(cartItem => {
+          const latestMenu = latestMenus.find((m: any) => m.menuId === cartItem.menuId);
+          // 메뉴가 삭제되었거나, isSoldOut 또는 soldOut이 true로 변경된 경우 품절로 간주
+          return !latestMenu || latestMenu.isSoldOut === true || latestMenu.soldOut === true;
+        });
+
+        // 3. 품절된 메뉴가 장바구니에 포함되어 있다면 알림을 띄우고 다음 단계로 넘어가는 것을 막습니다.
+        if (soldOutItemsInCart.length > 0) {
+          const soldOutNames = soldOutItemsInCart.map(item => item.menuName).join(', ');
+          alert(`죄송합니다. 담으신 메뉴 중 방금 품절된 상품이 있습니다:\n[${soldOutNames}]\n장바구니를 다시 확인해 주세요.`);
+          
+          // 사용자가 품절 상태를 바로 볼 수 있도록 전체 메뉴 리스트 상태도 최신화해줍니다.
+          const fetchedMenus = latestMenus.map((m: any) => ({
+            ...m,
+            soldOut: m.isSoldOut !== undefined ? m.isSoldOut : m.soldOut
+          }));
+          setMenuList(fetchedMenus);
+          
+          return; // PAYMENT 단계로 넘어가지 않고 함수 종료
+        }
+      } else {
+        alert("최신 메뉴 정보를 확인하지 못했습니다. 다시 시도해주세요.");
+        return;
+      }
+    } catch (error) {
+      console.error("최신 메뉴 정보 확인 에러:", error);
+      alert("서버와 통신하는 중 에러가 발생했습니다.");
+      return;
+    }
+
+    // 4. 품절된 메뉴가 없다면 정상적으로 결제 단계로 넘어갑니다.
     setIsCartOpen(false); 
     setStep('PAYMENT');   
   };
