@@ -570,44 +570,43 @@ export default function OrderPage() {
             </div>
           </div>
 
-          {/* 기존 코드 수정 */}
           <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 p-4 pb-6 z-20 shadow-[0_-10px_30px_rgba(0,0,0,0.05)]">
-            <div className="flex justify-between items-center mb-4 px-2">
-              
-              {/* ✨ 이 부분을 수정하여 '수량' 글씨 아래에 총 토큰을 띄웁니다 */}
-              <div className="flex flex-col gap-1">
-                <span className="font-bold text-gray-700">수량 (최대 9개)</span>
-                <span className="text-xs font-bold text-orange-600">
-                  총 🪙 {calculateTokens(selectedMenu.price) * detailQuantity}개 획득 예정
+            <div className="flex items-center gap-4 mb-4">
+              {/* 왼쪽: 수량 조절 및 토큰 정보 */}
+              <div className="flex flex-col gap-0.5 justify-center">
+                <span className="text-xs font-bold text-gray-400">수량</span>
+                <div className="flex items-center gap-3">
+                  <button 
+                    onClick={() => setDetailQuantity(Math.max(1, detailQuantity - 1))}
+                    className="w-8 h-8 flex items-center justify-center text-gray-900 bg-gray-100 rounded-full hover:bg-gray-200 disabled:opacity-30"
+                    disabled={detailQuantity <= 1}
+                  >
+                    <Minus size={16} />
+                  </button>
+                  <span className="text-lg font-bold w-6 text-center">{detailQuantity}</span>
+                  <button 
+                    onClick={() => setDetailQuantity(Math.min(9, detailQuantity + 1))}
+                    className="w-8 h-8 flex items-center justify-center text-gray-900 bg-gray-100 rounded-full hover:bg-gray-200 disabled:opacity-30"
+                    disabled={detailQuantity >= 9}
+                  >
+                    <Plus size={16} />
+                  </button>
+                </div>
+                <span className="text-[10px] font-bold text-orange-600 mt-1">
+                  🪙 {calculateTokens(selectedMenu.price) * detailQuantity}개 획득 예정
                 </span>
               </div>
 
-              <div className="flex items-center gap-4">
-                <button 
-                  onClick={() => setDetailQuantity(Math.max(1, detailQuantity - 1))}
-                  className="p-2 text-gray-900 bg-gray-100 rounded-full hover:bg-gray-200 disabled:opacity-30"
-                  disabled={detailQuantity <= 1}
-                >
-                  <Minus size={20} />
-                </button>
-                <span className="text-lg font-bold w-6 text-center">{detailQuantity}</span>
-                <button 
-                  onClick={() => setDetailQuantity(Math.min(9, detailQuantity + 1))}
-                  className="p-2 text-gray-900 bg-gray-100 rounded-full hover:bg-gray-200 disabled:opacity-30"
-                  disabled={detailQuantity >= 9}
-                >
-                  <Plus size={20} />
-                </button>
-              </div>
+              {/* 오른쪽: 담기 버튼 (flex-1을 사용해 2/3 비율로 배치) */}
+              <button 
+                onClick={handleDetailAddToCart}
+                className="flex-1 bg-orange-500 text-white py-4 rounded-xl font-bold text-lg hover:bg-orange-600 active:scale-[0.98] transition-all flex flex-col justify-center items-center"
+              >
+                <span>{(selectedMenu.price * detailQuantity).toLocaleString()}원</span>
+                <span className="text-xs opacity-90 font-medium">장바구니 담기</span>
+              </button>
             </div>
-            <button 
-              onClick={handleDetailAddToCart}
-              className="w-full bg-orange-500 text-white py-4 rounded-xl font-bold text-lg hover:bg-orange-600 active:scale-[0.98] transition-all flex justify-center items-center"
-            >
-              {(selectedMenu.price * detailQuantity).toLocaleString()}원 담기
-            </button>
           </div>
-        </div>
       )}
 
       {/* 2. PAYMENT 단계 */}
