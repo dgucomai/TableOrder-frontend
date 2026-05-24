@@ -112,6 +112,13 @@ export default function OrderPage() {
     loadTableAndMenus(initialToken);
   }, []);
 
+  // 장바구니가 비워지면 자동으로 모달 닫기 (0원 결제 방지)
+  useEffect(() => {
+    if (cart.length === 0 && isCartOpen) {
+      setIsCartOpen(false);
+    }
+  }, [cart, isCartOpen]);
+
   const fetchMenus = async () => {
     try {
       const response = await fetch(`${API_BASE_URL}/menus`);
@@ -557,15 +564,24 @@ export default function OrderPage() {
               </div>
               <div className="flex justify-end mt-2">
                  <span className="text-xs bg-orange-100 text-orange-600 px-2 py-1 rounded-md font-bold">
-                    주문 시 🪙 {calculateTokens(selectedMenu.price * detailQuantity)}개 획득
+                    주문 시 🪙 {calculateTokens(selectedMenu.price)}개 획득
                   </span>
               </div>
             </div>
           </div>
 
+          {/* 기존 코드 수정 */}
           <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 p-4 pb-6 z-20 shadow-[0_-10px_30px_rgba(0,0,0,0.05)]">
             <div className="flex justify-between items-center mb-4 px-2">
-              <span className="font-bold text-gray-700">수량 (최대 9개)</span>
+              
+              {/* ✨ 이 부분을 수정하여 '수량' 글씨 아래에 총 토큰을 띄웁니다 */}
+              <div className="flex flex-col gap-1">
+                <span className="font-bold text-gray-700">수량 (최대 9개)</span>
+                <span className="text-xs font-bold text-orange-600">
+                  총 🪙 {calculateTokens(selectedMenu.price) * detailQuantity}개 획득 예정
+                </span>
+              </div>
+
               <div className="flex items-center gap-4">
                 <button 
                   onClick={() => setDetailQuantity(Math.max(1, detailQuantity - 1))}
@@ -689,7 +705,7 @@ export default function OrderPage() {
                     <div className="flex items-center gap-2 mt-1 whitespace-nowrap">
                       <p className="text-sm text-gray-500">{item.price.toLocaleString()}원</p>
                       <span className="text-[10px] bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded-md font-bold">
-                        🪙 {calculateTokens(item.price * item.quantity)}개
+                        🪙 +{calculateTokens(item.price) * item.quantity}개
                       </span>
                     </div>
                   </div>
