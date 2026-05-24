@@ -97,7 +97,7 @@ function OrderHistoryContent() {
   const Header = () => (
     <header className="sticky top-0 z-10 bg-white border-b px-4 py-4 flex items-center shadow-sm">
       <div className="flex-1 flex justify-start">
-        <Link href="/customer" replace className="p-2 -ml-2 text-gray-700 hover:bg-gray-100 rounded-full transition-colors">
+        <Link href={qt ? `/customer?qt=${qt}` : '/access-denied'} replace className="p-2 -ml-2 text-gray-700 hover:bg-gray-100 rounded-full transition-colors">
           <ChevronLeft size={24} />
         </Link>
       </div>
