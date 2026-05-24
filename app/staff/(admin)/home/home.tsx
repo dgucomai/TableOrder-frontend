@@ -78,6 +78,8 @@ export default function AdminHomePage() {
 
   useEffect(() => {
     fetchInitialTables();
+    const interval = setInterval(fetchInitialTables, 60000);
+    return () => clearInterval(interval);
   }, [fetchInitialTables]);
 
   // [API 연동 4] SSE 이벤트 구독 (연결은 SseProvider가 layout에서 관리)
