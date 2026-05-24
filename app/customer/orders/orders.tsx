@@ -3,7 +3,7 @@
 import React, { useEffect, useState, Suspense } from 'react';
 import { ChevronLeft, CheckCircle2, Clock, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation'; // [추가: URL 파라미터 추출용]
+import { useSearchParams } from 'next/navigation';
 
 type OrderStatus = string;
 
@@ -69,17 +69,15 @@ const getStatusConfig = (status: OrderStatus) => {
   }
 };
 
-// [수정: 파라미터를 받아오는 메인 컴포넌트 분리]
 function OrderHistoryContent() {
   const searchParams = useSearchParams();
-  const qt = searchParams.get('qt'); // URL에서 ?qt=값 추출
+  const qt = searchParams.get('qt'); 
 
   const [orders, setOrders] = useState<OrderInfo[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // 파라미터가 없으면 API 요청 자체를 막음
     if (!qt) {
       setError('주문 테이블 정보(qt 파라미터)가 없습니다.');
       setIsLoading(false);
@@ -89,7 +87,6 @@ function OrderHistoryContent() {
     const fetchOrders = async () => {
       try {
         setIsLoading(true);
-        // 추출한 qt 파라미터를 API URL에 동적 할당
         const response = await fetch(`https://donggukcomai.shop/api/billing?qt=${qt}`);
         
         if (!response.ok) {
@@ -97,19 +94,20 @@ function OrderHistoryContent() {
         }
 
         const json = await response.json();
-        console.log("API 원본 응답 데이터:", json); // [디버깅: 서버 응답 전체 구조 확인]
+        console.log("API 원본 응답 데이터:", json);
 
         if (json.success && json.data && Array.isArray(json.data.orders)) {
           const mappedOrders: OrderInfo[] = json.data.orders.map((order: any) => {
             const totalPrice = order.items?.reduce((sum: number, item: any) => sum + item.subtotal, 0) || 0;
             
-            console.log(`주문 ID [${order.orderId}]의 원본 상태값:`, order.orderStatus); // [디버깅: 상태값 확인]
+            console.log(`주문 ID [${order.orderId}]의 원본 상태값:`, order.orderStatus);
 
             return {
               orderId: `ORD-${order.orderId}`,
               date: formatDateTime(order.createdAt),
               items: order.items?.map((item: any) => ({
-                name: `메뉴 ID: ${item.orderItemId}`,
+                // API 응답의 menuName을 사용하도록 수정
+                name: item.menuName || '알 수 없는 메뉴',
                 quantity: item.quantity
               })) || [],
               totalPrice,
@@ -219,7 +217,6 @@ function OrderHistoryContent() {
   );
 }
 
-// [추가: Next.js useSearchParams 에러 방지를 위한 Suspense 래핑]
 export default function OrderHistoryPage() {
   return (
     <div className="min-h-screen bg-gray-50 pb-10">
