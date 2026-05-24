@@ -37,8 +37,8 @@ export default function OrderPage() {
   const [currentTokenCount, setCurrentTokenCount] = useState<number>(0); 
   
   const [menuList, setMenuList] = useState<MenuItem[]>([]);
-  const [categories, setCategories] = useState<string[]>(["All"]);
-  const [activeCategory, setActiveCategory] = useState("All");
+  const [categories, setCategories] = useState<string[]>([]); // ALL 삭제
+  const [activeCategory, setActiveCategory] = useState("");
   
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
@@ -51,7 +51,7 @@ export default function OrderPage() {
   const [customCallText, setCustomCallText] = useState("");
   const [isCallLoading, setIsCallLoading] = useState(false);
 
-  // --- 🆕 상세 메뉴 모달용 상태 ---
+  // --- 상세 메뉴 모달용 상태 ---
   const [selectedMenu, setSelectedMenu] = useState<MenuItem | null>(null);
   const [detailQuantity, setDetailQuantity] = useState<number>(1);
   const categoryRefs = useRef<Record<string, HTMLDivElement | null>>({});
@@ -124,8 +124,13 @@ export default function OrderPage() {
         }));
         
         setMenuList(fetchedMenus);
+        
+        // ALL 제거 후 실제 카테고리만 저장
         const uniqueCategories = Array.from(new Set(fetchedMenus.map((m: MenuItem) => m.categoryName))) as string[];
-        setCategories(["All", ...uniqueCategories]);
+        setCategories(uniqueCategories);
+        if (uniqueCategories.length > 0) {
+          setActiveCategory(uniqueCategories[0]);
+        }
       } else {
         alert(result.message || "메뉴를 불러오지 못했습니다.");
       }
@@ -134,28 +139,28 @@ export default function OrderPage() {
     }
   };
 
-  // --- 🆕 카테고리 스크롤 함수 ---
+  // --- 카테고리 스크롤 함수 ---
   const scrollToCategory = (category: string) => {
     setActiveCategory(category);
-    if (category === "All") {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    } else {
-      const el = categoryRefs.current[category];
-      if (el) {
-        // 상단 헤더와 카테고리 탭 높이를 고려한 여백(약 120px) 추가
-        const y = el.getBoundingClientRect().top + window.scrollY - 120;
-        window.scrollTo({ top: y, behavior: 'smooth' });
-      }
+    const el = categoryRefs.current[category];
+    if (el) {
+      // 상단 헤더와 탭 높이를 고려한 여백 적용
+      const y = el.getBoundingClientRect().top + window.scrollY - 120;
+      window.scrollTo({ top: y, behavior: 'smooth' });
     }
   };
 
-  // --- 장바구니 관련 함수 ---
+  // --- 장바구니 로직 (최대 9개 제한) ---
   const addToCart = (item: MenuItem, qty: number = 1) => {
     if (item.soldOut) return;
     setCart(prev => {
       const existing = prev.find(i => i.menuId === item.menuId);
-      if (existing) return prev.map(i => i.menuId === item.menuId ? { ...i, quantity: i.quantity + qty } : i);
-      return [...prev, { ...item, quantity: qty }];
+      if (existing) {
+        // 기존 담긴 수량과 추가하려는 수량 합산 시 9개를 넘지 못하도록 제한
+        const newQuantity = Math.min(9, existing.quantity + qty);
+        return prev.map(i => i.menuId === item.menuId ? { ...i, quantity: newQuantity } : i);
+      }
+      return [...prev, { ...item, quantity: Math.min(9, qty) }];
     });
   };
 
@@ -171,13 +176,15 @@ export default function OrderPage() {
   const openMenuDetail = (item: MenuItem) => {
     if (item.soldOut) return;
     setSelectedMenu(item);
-    setDetailQuantity(1); // 모달 열 때 수량 1로 초기화
+    
+    // 모달 열 때, 장바구니에 이미 있다면 그 수량에서부터 시작하고 없으면 1로 초기화 (선택사항이나, UX상 보통 1로 둡니다)
+    setDetailQuantity(1); 
   };
 
   const handleDetailAddToCart = () => {
     if (!selectedMenu) return;
     addToCart(selectedMenu, detailQuantity);
-    setSelectedMenu(null); // 모달 닫기
+    setSelectedMenu(null); 
   };
 
   const totalQuantity = cart.reduce((sum, item) => sum + item.quantity, 0);
@@ -312,9 +319,6 @@ export default function OrderPage() {
     }
   };
 
-  // "All"을 제외한 실제 카테고리 목록
-  const actualCategories = categories.filter(c => c !== "All");
-
   return (
     <div className="min-h-screen bg-gray-50 pb-28 relative">
       {/* 🔄 로딩 화면 */}
@@ -366,7 +370,7 @@ export default function OrderPage() {
               </div>
             </header>
             
-            {/* 🆕 카테고리 탭 (스크롤 네비게이션 역할) */}
+            {/* 카테고리 탭 (스크롤 네비게이션 역할) */}
             <div className="flex gap-2 overflow-x-auto px-4 py-3 border-b border-gray-100 scrollbar-hide bg-white">
               {categories.map(cat => (
                 <button 
@@ -387,8 +391,7 @@ export default function OrderPage() {
               </div>
             ) : (
               <>
-                {/* 🆕 카테고리별 전체 메뉴 렌더링 */}
-                {actualCategories.map(category => {
+                {categories.map((category, index) => {
                   const categoryMenus = menuList.filter(item => item.categoryName === category);
                   if (categoryMenus.length === 0) return null;
 
@@ -396,40 +399,76 @@ export default function OrderPage() {
                     <div 
                       key={category} 
                       ref={el => { categoryRefs.current[category] = el; }} 
-                      className="pt-6"
                     >
-                      <h2 className="px-4 text-xl font-extrabold text-gray-900 mb-2">{category}</h2>
-                      <div className="flex flex-col">
-                        {categoryMenus.map(item => (
-                          <div 
-                            key={item.menuId} 
-                            onClick={() => openMenuDetail(item)}
-                            className={`flex gap-4 p-4 border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors ${item.soldOut ? "opacity-50 pointer-events-none" : ""}`}
-                          >
-                            {/* 🆕 첨부 사진처럼 텍스트 좌측, 이미지 우측으로 배치 */}
-                            <div className="flex-1 flex flex-col py-1 min-w-0">
-                              <div className="min-w-0 mb-1">
-                                <div className="flex items-start gap-2">
-                                  <h3 className="font-bold text-[17px] text-gray-900 leading-tight truncate">{item.menuName}</h3>
-                                  {item.soldOut && <span className="text-[10px] bg-red-100 text-red-600 px-2 py-0.5 rounded font-bold whitespace-nowrap shrink-0 mt-0.5">품절</span>}
+                      {/* 카테고리 사이 굵은 회색 갭 라인 추가 */}
+                      {index > 0 && <div className="h-3 w-full bg-gray-100 border-y border-gray-200/60" />}
+                      
+                      <div className="pt-6">
+                        <h2 className="px-4 text-xl font-extrabold text-gray-900 mb-2">{category}</h2>
+                        <div className="flex flex-col">
+                          {categoryMenus.map(item => {
+                            const cartItem = cart.find(i => i.menuId === item.menuId);
+
+                            return (
+                              <div 
+                                key={item.menuId} 
+                                onClick={() => openMenuDetail(item)}
+                                className={`flex gap-4 p-4 border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors ${item.soldOut ? "opacity-50 pointer-events-none" : ""}`}
+                              >
+                                <div className="flex-1 flex flex-col py-0.5 min-w-0">
+                                  <div className="min-w-0 mb-1">
+                                    <div className="flex items-start gap-2">
+                                      <h3 className="font-bold text-[17px] text-gray-900 leading-tight truncate">{item.menuName}</h3>
+                                      {item.soldOut && <span className="text-[10px] bg-red-100 text-red-600 px-2 py-0.5 rounded font-bold whitespace-nowrap shrink-0 mt-0.5">품절</span>}
+                                    </div>
+                                    <p className="text-sm text-gray-400 mt-1 truncate">{item.description}</p>
+                                  </div>
+                                  
+                                  {/* 가격 & 카트 컨트롤 영역 */}
+                                  <div className="flex justify-between items-end mt-auto min-h-[32px]">
+                                    <div className="flex items-center gap-1.5 whitespace-nowrap pb-1">
+                                      <span className="font-bold text-gray-900 text-base">{item.price.toLocaleString()}원</span>
+                                      <span className="text-[10px] bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded-md font-bold">
+                                        🪙 +{calculateTokens(item.price)}
+                                      </span>
+                                    </div>
+
+                                    {/* 장바구니에 담긴 아이템일 때만 우측에 수량 조절 버튼 노출 */}
+                                    {cartItem && !item.soldOut && (
+                                      <div 
+                                        className="flex items-center bg-white rounded-lg border border-gray-200 shadow-sm shrink-0 h-8" 
+                                        onClick={(e) => e.stopPropagation()} // 모달 오픈 방지
+                                      >
+                                        <button 
+                                          onClick={() => removeFromCart(item.menuId)} 
+                                          className="w-8 h-full flex items-center justify-center text-gray-700 hover:bg-gray-50 rounded-l-lg transition-colors"
+                                        >
+                                          <Minus size={14} strokeWidth={3} />
+                                        </button>
+                                        <span className="w-6 text-center text-sm font-bold text-gray-900">
+                                          {cartItem.quantity}
+                                        </span>
+                                        <button 
+                                          onClick={() => addToCart(item, 1)} 
+                                          disabled={cartItem.quantity >= 9}
+                                          className="w-8 h-full flex items-center justify-center text-gray-700 hover:bg-gray-50 rounded-r-lg disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+                                        >
+                                          <Plus size={14} strokeWidth={3} />
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
                                 </div>
-                                <p className="text-sm text-gray-400 mt-1 truncate">{item.description}</p>
+                                
+                                {item.imageUrl ? (
+                                  <img src={item.imageUrl} alt={item.menuName} className="w-24 h-24 rounded-xl object-cover shrink-0 bg-gray-100 border border-black/5" />
+                                ) : (
+                                  <div className="w-24 h-24 rounded-xl shrink-0 bg-gray-200 flex items-center justify-center text-xs text-gray-400 whitespace-nowrap">No Image</div>
+                                )}
                               </div>
-                              <div className="flex items-center gap-1.5 mt-auto whitespace-nowrap">
-                                <span className="font-bold text-gray-900 text-base">{item.price.toLocaleString()}원</span>
-                                <span className="text-[10px] bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded-md font-bold">
-                                  🪙 +{calculateTokens(item.price)}
-                                </span>
-                              </div>
-                            </div>
-                            
-                            {item.imageUrl ? (
-                              <img src={item.imageUrl} alt={item.menuName} className="w-24 h-24 rounded-xl object-cover shrink-0 bg-gray-100" />
-                            ) : (
-                              <div className="w-24 h-24 rounded-xl shrink-0 bg-gray-200 flex items-center justify-center text-xs text-gray-400 whitespace-nowrap">No Image</div>
-                            )}
-                          </div>
-                        ))}
+                            );
+                          })}
+                        </div>
                       </div>
                     </div>
                   );
@@ -446,10 +485,9 @@ export default function OrderPage() {
         </>
       )}
 
-      {/* 🆕 4. 상세 메뉴 모달 (터치 시 열림) */}
+      {/* 4. 상세 메뉴 모달 */}
       {selectedMenu && (
         <div className="fixed inset-0 z-[70] bg-white flex flex-col animate-in slide-in-from-bottom-4 duration-200">
-          {/* 뒤로가기 헤더 (사진 위에 띄움) */}
           <button 
             onClick={() => setSelectedMenu(null)} 
             className="absolute top-4 left-4 z-10 p-2 bg-white/80 backdrop-blur-md rounded-full shadow-sm text-gray-900 hover:bg-white"
@@ -458,14 +496,13 @@ export default function OrderPage() {
           </button>
 
           <div className="flex-1 overflow-y-auto pb-32">
-            {/* 큰 이미지 */}
+            {/* 큰 이미지: 4:3 비율(가로로 살짝 긴 형태)로 크롭하여 렌더링 */}
             {selectedMenu.imageUrl ? (
-              <img src={selectedMenu.imageUrl} alt={selectedMenu.menuName} className="w-full aspect-square object-cover bg-gray-100" />
+              <img src={selectedMenu.imageUrl} alt={selectedMenu.menuName} className="w-full aspect-[4/3] object-cover bg-gray-100" />
             ) : (
-              <div className="w-full aspect-square bg-gray-200 flex items-center justify-center text-gray-400">이미지 준비중</div>
+              <div className="w-full aspect-[4/3] bg-gray-200 flex items-center justify-center text-gray-400">이미지 준비중</div>
             )}
             
-            {/* 메뉴 정보 */}
             <div className="p-5">
               <h1 className="text-2xl font-black text-gray-900 mb-2">{selectedMenu.menuName}</h1>
               <p className="text-gray-500 text-sm leading-relaxed mb-6">{selectedMenu.description}</p>
@@ -476,16 +513,15 @@ export default function OrderPage() {
               </div>
               <div className="flex justify-end mt-2">
                  <span className="text-xs bg-orange-100 text-orange-600 px-2 py-1 rounded-md font-bold">
-                    주문 시 🪙 {calculateTokens(selectedMenu.price)}개 획득
+                    주문 시 🪙 {calculateTokens(selectedMenu.price * detailQuantity)}개 획득
                   </span>
               </div>
             </div>
           </div>
 
-          {/* 하단 수량 조절 및 장바구니 담기 바 */}
           <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 p-4 pb-6 z-20 shadow-[0_-10px_30px_rgba(0,0,0,0.05)]">
             <div className="flex justify-between items-center mb-4 px-2">
-              <span className="font-bold text-gray-700">수량</span>
+              <span className="font-bold text-gray-700">수량 (최대 9개)</span>
               <div className="flex items-center gap-4">
                 <button 
                   onClick={() => setDetailQuantity(Math.max(1, detailQuantity - 1))}
@@ -496,8 +532,9 @@ export default function OrderPage() {
                 </button>
                 <span className="text-lg font-bold w-6 text-center">{detailQuantity}</span>
                 <button 
-                  onClick={() => setDetailQuantity(detailQuantity + 1)}
-                  className="p-2 text-gray-900 bg-gray-100 rounded-full hover:bg-gray-200"
+                  onClick={() => setDetailQuantity(Math.min(9, detailQuantity + 1))}
+                  className="p-2 text-gray-900 bg-gray-100 rounded-full hover:bg-gray-200 disabled:opacity-30"
+                  disabled={detailQuantity >= 9}
                 >
                   <Plus size={20} />
                 </button>
@@ -515,7 +552,6 @@ export default function OrderPage() {
 
       {/* 2. PAYMENT 단계 */}
       {step === 'PAYMENT' && (
-        /* 기존 로직 유지... (생략 없이 원본 유지) */
         <div className="fixed inset-0 z-50 bg-black/60 flex items-end">
           <div className="bg-white w-full rounded-t-[32px] p-8 animate-in slide-in-from-bottom duration-300">
             <h2 className="text-2xl text-black font-black mb-6 whitespace-nowrap truncate">입금 정보를 확인해주세요</h2>
@@ -593,7 +629,7 @@ export default function OrderPage() {
         </div>
       )}
 
-      {/* 장바구니 모달 */}
+      {/* 장바구니 모달 (장바구니 내부에서도 최대 9개 제한) */}
       {isCartOpen && (
         <div className="fixed inset-0 z-50 bg-black/60 flex flex-col justify-end">
           <div className="bg-white w-full rounded-t-3xl max-h-[85vh] flex flex-col p-5">
@@ -609,14 +645,20 @@ export default function OrderPage() {
                     <div className="flex items-center gap-2 mt-1 whitespace-nowrap">
                       <p className="text-sm text-gray-500">{item.price.toLocaleString()}원</p>
                       <span className="text-[10px] bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded-md font-bold">
-                        🪙 {calculateTokens(item.price)}개
+                        🪙 {calculateTokens(item.price * item.quantity)}개
                       </span>
                     </div>
                   </div>
                   <div className="flex items-center bg-gray-50 rounded-lg border ml-2 shrink-0">
                     <button onClick={() => removeFromCart(item.menuId)} className="p-2 text-gray-700 shrink-0"><Minus size={16} /></button>
                     <span className="w-8 text-center text-gray-900 font-bold whitespace-nowrap shrink-0">{item.quantity}</span>
-                    <button onClick={() => addToCart(item)} className="p-2 text-gray-700 shrink-0"><Plus size={16} /></button>
+                    <button 
+                      onClick={() => addToCart(item, 1)} 
+                      disabled={item.quantity >= 9}
+                      className="p-2 text-gray-700 shrink-0 disabled:opacity-30"
+                    >
+                      <Plus size={16} />
+                    </button>
                   </div>
                 </div>
               ))}
@@ -694,5 +736,5 @@ export default function OrderPage() {
         </div>
       )}
     </div>
-  )
+  );
 }
