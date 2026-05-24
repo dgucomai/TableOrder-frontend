@@ -7,18 +7,20 @@ import { motion, AnimatePresence } from "framer-motion";
 
 interface Order {
   id: string;         // 고유 UI 렌더링용 키 (orderId-orderItemId)
-  orderId: number;    // API 통신용 실제 주문 ID
+  orderId: number;    // 전체 주문 승인/취소 API 통신용
+  orderItemId: number; // 개별 메뉴 상태 변경 API 통신용
   name: string;
   quantity: number;
   price: number;
   time: string;
-  status: "입금 확인 대기" | "준비 중" | "제공 완료";
+  orderStatus: "입금 확인 대기" | "준비 중" | "제공 완료"; // 전체 주문 상태
+  itemStatus: "입금 확인 대기" | "준비 중" | "제공 완료"; // 개별 메뉴 상태
   isTokenPayment?: boolean;
 }
 
 interface CallInfo {
-  id: string;         // 내부 관리용 고유 키
-  callId?: number;    // 실제 직원 호출 API용 ID
+  id: string;
+  callId?: number;
   type: "직원 호출" | "딜러 호출" | "입금 확인";
   time: string;
   message?: string;
@@ -55,6 +57,16 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
       case "COOKING": return "준비 중";
       case "COMPLETED": return "제공 완료";
       default: return "준비 중";
+    }
+  };
+
+  // 하위 메뉴(Item)의 상태를 매핑하는 헬퍼 함수
+  const mapItemStatus = (itemStatus: string | null, orderStatus: string) => {
+    if (orderStatus === "PAYMENT_PENDING" && !itemStatus) return "입금 확인 대기";
+    switch (itemStatus) {
+      case "SERVED": return "제공 완료";
+      case "PREPARING": return "준비 중";
+      default: return orderStatus === "PAYMENT_PENDING" ? "입금 확인 대기" : "준비 중";
     }
   };
 
@@ -111,17 +123,20 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
         if (tableData.orders && Array.isArray(tableData.orders)) {
           tableData.orders.forEach((order: any) => {
             const timeStr = formatTime(order.createdAt);
-            const statusStr = mapOrderStatus(order.orderStatus);
+            const oStatusStr = mapOrderStatus(order.orderStatus);
+            
             if (order.items && Array.isArray(order.items)) {
               order.items.forEach((item: any) => {
                 mappedOrders.push({
                   id: `${order.orderId}-${item.orderItemId}`,
                   orderId: order.orderId,
+                  orderItemId: item.orderItemId,
                   name: item.menuName,
                   quantity: item.quantity,
                   price: item.unitPrice,
                   time: timeStr,
-                  status: statusStr as Order["status"],
+                  orderStatus: oStatusStr as Order["orderStatus"],
+                  itemStatus: mapItemStatus(item.itemStatus, order.orderStatus) as Order["itemStatus"],
                   isTokenPayment: false
                 });
               });
@@ -138,25 +153,6 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 60000);
     if (tableId) fetchTableDetail();
-    
-    // [TODO] SSE 연결 주소가 백엔드 명세서에 확정되면 활성화하세요.
-    /*
-    const token = localStorage.getItem("accessToken") || "";
-    const eventSource = new EventSource(`/api/sse/staff?token=${token}`);
-    
-    eventSource.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      // tableId가 현재 팝업의 tableId와 같을 경우에만 데이터를 갱신합니다.
-      if (data.table && data.table.tableId === tableId) {
-         fetchTableDetail(); // 변경 감지 시 새로고침
-      }
-    };
-    return () => {
-      clearInterval(timer);
-      eventSource.close();
-    };
-    */
-
     return () => clearInterval(timer);
   }, [tableId]);
 
@@ -171,10 +167,8 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
     return h > 0 ? `${h}시간 ${m}분` : `${m}분`;
   }, [startedAt, currentTime]);
 
-  // 빈 테이블 여부 판단 (이용 시작 시간이 없으면 빈 테이블)
   const isEmptyTable = !startedAt;
 
-  // [API 연동] 직원/딜러 호출 처리 완료
   const handleAcceptCall = async (call: CallInfo) => {
     if (call.id.startsWith("pr-")) {
       alert("하단 주문 리스트에서 '입금 확인'을 진행해 주세요.");
@@ -205,9 +199,8 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
     }
   };
 
-  // 1. [API 연동] 입금 대기 승인
   const confirmGroupDeposit = async (time: string) => {
-    const groupOrders = groupedOrders[time].filter((o: Order) => o.status === "입금 확인 대기");
+    const groupOrders = groupedOrders[time].filter((o: Order) => o.orderStatus === "입금 확인 대기");
     const uniqueOrderIds = Array.from(new Set(groupOrders.map((o: Order) => o.orderId)));
 
     if (uniqueOrderIds.length === 0) return;
@@ -229,8 +222,8 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
 
       if (allSuccess) {
         setOrders(prev => prev.map(order => 
-          order.time === time && order.status === "입금 확인 대기" 
-            ? { ...order, status: "준비 중" } 
+          order.time === time && order.orderStatus === "입금 확인 대기" 
+            ? { ...order, orderStatus: "준비 중", itemStatus: "준비 중" } 
             : order
         ));
         
@@ -246,19 +239,27 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
     }
   };
 
-  // [API 연동] 실제 주문 상태 변경
-  const updateOrderStatus = async (orderId: number, currentStatus: string) => {
-    if (currentStatus === "제공 완료" || currentStatus === "입금 확인 대기") return;
+  // [API 연동] 개별 메뉴 상태 변경 (준비 중 <-> 제공 완료)
+  const updateItemStatus = async (orderItemId: number, currentItemStatus: string) => {
+    if (currentItemStatus === "입금 확인 대기") return;
+
+    // 현재 상태에 따라 다음 상태 결정 (토글 방식)
+    const nextStatus = currentItemStatus === "준비 중" ? "SERVED" : "PREPARING";
+    const nextStatusKr = currentItemStatus === "준비 중" ? "제공 완료" : "준비 중";
 
     try {
-      const response = await staffFetch(`/api/staff/orders/${orderId}/status`, {
+      const response = await staffFetch(`/api/staff/items/${orderItemId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "COMPLETED" }),
+        body: JSON.stringify({ status: nextStatus }),
       });
       
       if (response.ok) {
-        setOrders(prev => prev.map(order => order.orderId === orderId ? { ...order, status: "제공 완료" } : order));
+        setOrders(prev => prev.map(order => 
+          order.orderItemId === orderItemId 
+            ? { ...order, itemStatus: nextStatusKr } 
+            : order
+        ));
       } else {
         alert("상태 변경에 실패했습니다.");
       }
@@ -267,7 +268,6 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
     }
   };
 
-  // 삭제 팝업 제어
   const handleDeleteGroupClick = (time: string) => { 
     setIsEditTokenOpen(false); 
     setIsResetOpen(false); 
@@ -276,11 +276,10 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
     setIsDeleteOrderOpen(true); 
   };
 
-  // 2. [API 연동] 주문 대기 취소
   const executeDeleteGroup = async () => {
     if (!timeToDelete) return; 
     
-    const groupOrders = orders.filter(o => o.time === timeToDelete && o.status === "입금 확인 대기");
+    const groupOrders = orders.filter(o => o.time === timeToDelete && o.orderStatus === "입금 확인 대기");
     const uniqueOrderIds = Array.from(new Set(groupOrders.map(o => o.orderId)));
 
     try {
@@ -311,7 +310,6 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
     }
   };
 
-  // [API 연동] 테이블 정리/초기화
   const handleResetTable = async () => {
     if (!tableId) return;
 
@@ -415,7 +413,6 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
           </div>
 
           <div className="flex-1 overflow-y-auto p-6 sm:p-10 space-y-6 sm:space-y-8 custom-scrollbar">
-            {/* 호출 리스트 */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <AnimatePresence mode="popLayout">
                 {activeCalls.slice(0, 3).map((call) => (
@@ -441,11 +438,10 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
               </AnimatePresence>
             </div>
 
-            {/* 주문 타임라인 */}
             <div className="space-y-6">
               <p className="text-[10px] font-bold text-slate-500 flex items-center gap-2 uppercase tracking-widest"><Clock size={12} /> 주문 타임라인</p>
               {Object.keys(groupedOrders).map((time) => {
-                const isWaitingDeposit = groupedOrders[time].some((o: Order) => o.status === "입금 확인 대기");
+                const isWaitingDeposit = groupedOrders[time].some((o: Order) => o.orderStatus === "입금 확인 대기");
                 
                 return (
                   <div key={time} className="bg-[#0f172a]/40 rounded-2xl p-4 border border-white/5 relative">
@@ -472,21 +468,20 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
                             <span className="text-xs text-slate-500">{order.price.toLocaleString()}{order.isTokenPayment ? 'T' : '원'} · {order.quantity}개</span>
                           </div>
                           
-                          {order.status === "입금 확인 대기" ? (
+                          {order.itemStatus === "입금 확인 대기" ? (
                             <div className="flex items-center gap-2 text-emerald-500/50 font-black text-xs uppercase bg-emerald-500/5 px-3 py-2 rounded-lg border border-emerald-500/10">
                               <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
                               입금 대기 중
                             </div>
                           ) : (
                             <button 
-                              onClick={() => updateOrderStatus(order.orderId, order.status)} 
-                              disabled={order.status === "제공 완료"}
+                              onClick={() => updateItemStatus(order.orderItemId, order.itemStatus)} 
                               className={`px-4 py-2 sm:px-6 sm:py-3 rounded-xl font-black text-xs sm:text-sm transition-all ${
-                                order.status === "제공 완료" 
-                                ? "bg-slate-700 text-slate-500 cursor-not-allowed" 
+                                order.itemStatus === "제공 완료" 
+                                ? "bg-slate-700 text-slate-400 hover:bg-slate-600 active:scale-95 shadow-inner" 
                                 : "bg-orange-500 text-white hover:bg-orange-400 active:scale-95 shadow-lg shadow-orange-900/20"
                               }`}>
-                              {order.status}
+                              {order.itemStatus}
                             </button>
                           )}
                         </div>
@@ -498,7 +493,7 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
                         <span className="text-sm font-bold text-emerald-500/80">입금 확인 대기 총액</span>
                         <span className="text-xl font-black text-emerald-400">
                           {groupedOrders[time]
-                            .filter((o: Order) => o.status === "입금 확인 대기")
+                            .filter((o: Order) => o.orderStatus === "입금 확인 대기")
                             .reduce((sum: number, o: Order) => sum + (o.price * o.quantity), 0)
                             .toLocaleString()
                           }원
@@ -541,9 +536,7 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
           </div>
         </motion.div>
         
-        {/* 사이드 팝업 영역 */}
         <AnimatePresence mode="wait">
-          
           {/* 토큰 증감 팝업 */}
           {isEditTokenOpen && (
             <motion.div key="token-edit" initial={{ x: "100%", opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: "100%", opacity: 0 }}
