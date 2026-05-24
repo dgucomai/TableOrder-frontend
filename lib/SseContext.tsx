@@ -48,6 +48,7 @@ export function SseProvider({ children }: { children: ReactNode }) {
 
       NAMED_EVENTS.forEach((eventType) => {
         es.addEventListener(eventType, (e: MessageEvent) => {
+          console.log(`[SSE recv] ${eventType}`, e.data);
           if (eventType === "heartbeat") return;
           dispatchSseEvent(eventType, e.data);
         });
