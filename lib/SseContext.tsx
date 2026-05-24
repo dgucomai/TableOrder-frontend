@@ -97,10 +97,6 @@ export function SseProvider({ children }: { children: ReactNode }) {
   return <SseContext.Provider value={{ subscribe }}>{children}</SseContext.Provider>;
 }
 
-export function useSubscribe() {
-  return useContext(SseContext).subscribe;
-}
-
 export function useSseEvent(eventType: string, handler: SseHandler) {
   const { subscribe } = useContext(SseContext);
   const handlerRef = useRef(handler);
