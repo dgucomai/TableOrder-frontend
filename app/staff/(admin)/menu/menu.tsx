@@ -283,7 +283,6 @@ export default function StaffMenuPage() {
                   <img
                     src={selectedMenu.imageUrl}
                     alt={selectedMenu.menuName}
-                    // 품절일 경우 이미지 살짝 블러 처리 및 어둡게 변경
                     className={`w-full h-full rounded-3xl object-cover bg-slate-900 transition-all ${
                       selectedMenu.isSoldOut ? "blur-[2px] brightness-75" : ""
                     }`}
@@ -315,13 +314,8 @@ export default function StaffMenuPage() {
                     {selectedMenu.menuName}
                   </h1>
                   
-                  {/* 품절 토글 버튼 및 상태 표시 배지 */}
+                  {/* 품절 토글 버튼 */}
                   <div className="mt-5 flex items-center gap-3">
-                    {selectedMenu.isSoldOut && (
-                      <div className="inline-flex items-center px-4 py-2 rounded-xl bg-red-500/10 text-red-500 text-sm font-black border border-red-500/20">
-                        현재 품절 상태
-                      </div>
-                    )}
                     <button
                       onClick={toggleSoldOutStatus}
                       disabled={isTogglingSoldOut}
