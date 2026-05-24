@@ -171,15 +171,16 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
     return h > 0 ? `${h}시간 ${m}분` : `${m}분`;
   }, [startedAt, currentTime]);
 
-  // [API 연동] 직원/딜러 호출 처리 완료 (PATCH /api/staff/calls/{callId}/resolve?staffId={staffId})
+  // 빈 테이블 여부 판단 (이용 시작 시간이 없으면 빈 테이블)
+  const isEmptyTable = !startedAt;
+
+  // [API 연동] 직원/딜러 호출 처리 완료
   const handleAcceptCall = async (call: CallInfo) => {
-    // 입금 확인(결제) 호출은 별도의 하단 주문 목록에서 처리하도록 유도
     if (call.id.startsWith("pr-")) {
       alert("하단 주문 리스트에서 '입금 확인'을 진행해 주세요.");
       return;
     }
 
-    // API 통신을 위한 실제 callId가 없을 경우 방어 로직
     if (!call.callId) {
       alert("유효하지 않은 호출입니다.");
       return;
@@ -191,11 +192,9 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
         headers: { "Content-Type": "application/json" },
       });
 
-      // 백엔드 응답 데이터 확인
       const result = await response.json().catch(() => ({})); 
 
       if (response.ok || result.success) {
-        // 성공 시 로컬 상태(화면)에서 해당 호출 알림만 즉시 제거
         setActiveCalls(prev => prev.filter(c => c.id !== call.id));
       } else {
         alert(result.message || "호출 처리에 실패했습니다.");
@@ -206,53 +205,48 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
     }
   };
 
-// 1. [API 연동] 입금 대기 승인 (PATCH /api/staff/orders/{orderId}/approve?staffId={staffId})
-const confirmGroupDeposit = async (time: string) => {
-  // 같은 시간에 주문된 항목 중 '입금 확인 대기' 상태인 주문들만 필터링
-  const groupOrders = groupedOrders[time].filter((o: Order) => o.status === "입금 확인 대기");
-  // 중복되는 orderId를 제거하여 한 번씩만 호출되도록 처리 (단일 주문에 여러 메뉴가 있을 수 있으므로)
-  const uniqueOrderIds = Array.from(new Set(groupOrders.map((o: Order) => o.orderId)));
+  // 1. [API 연동] 입금 대기 승인
+  const confirmGroupDeposit = async (time: string) => {
+    const groupOrders = groupedOrders[time].filter((o: Order) => o.status === "입금 확인 대기");
+    const uniqueOrderIds = Array.from(new Set(groupOrders.map((o: Order) => o.orderId)));
 
-  if (uniqueOrderIds.length === 0) return;
+    if (uniqueOrderIds.length === 0) return;
 
-  try {
-    const results = await Promise.all(
-      uniqueOrderIds.map(async (orderId) => {
-        const response = await staffFetch(`/api/staff/orders/${orderId}/approve`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-        });
+    try {
+      const results = await Promise.all(
+        uniqueOrderIds.map(async (orderId) => {
+          const response = await staffFetch(`/api/staff/orders/${orderId}/approve`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+          });
+          
+          if (!response.ok) throw new Error("서버 응답 오류");
+          return response.json(); 
+        })
+      );
+
+      const allSuccess = results.every(result => result.success);
+
+      if (allSuccess) {
+        setOrders(prev => prev.map(order => 
+          order.time === time && order.status === "입금 확인 대기" 
+            ? { ...order, status: "준비 중" } 
+            : order
+        ));
         
-        if (!response.ok) throw new Error("서버 응답 오류");
-        return response.json(); // {"success":true, "message":"ORDER_APPROVED"} 형태 반환
-      })
-    );
-
-    // 모든 API 요청이 성공(success: true)했는지 검증
-    const allSuccess = results.every(result => result.success);
-
-    if (allSuccess) {
-      // 로컬 상태 즉시 갱신: 해당 시간대의 대기 주문을 '준비 중'으로 변경
-      setOrders(prev => prev.map(order => 
-        order.time === time && order.status === "입금 확인 대기" 
-          ? { ...order, status: "준비 중" } 
-          : order
-      ));
-      
-      // 입금 확인 알림 배지가 상단에 있었다면 화면에서 제거
-      setActiveCalls(prev => prev.filter(call => call.time !== time && call.type !== "입금 확인"));
-      
-      alert("입금 확인이 완료되었습니다.");
-    } else {
-      alert("일부 주문의 입금 승인 처리에 실패했습니다.");
+        setActiveCalls(prev => prev.filter(call => call.time !== time && call.type !== "입금 확인"));
+        
+        alert("입금 확인이 완료되었습니다.");
+      } else {
+        alert("일부 주문의 입금 승인 처리에 실패했습니다.");
+      }
+    } catch (e) {
+      console.error(e);
+      alert("입금 승인 처리 중 네트워크 오류가 발생했습니다.");
     }
-  } catch (e) {
-    console.error(e);
-    alert("입금 승인 처리 중 네트워크 오류가 발생했습니다.");
-  }
-};
+  };
 
-  // [API 연동] 실제 주문 상태 변경 (PATCH /api/staff/orders/{orderId}/status)
+  // [API 연동] 실제 주문 상태 변경
   const updateOrderStatus = async (orderId: number, currentStatus: string) => {
     if (currentStatus === "제공 완료" || currentStatus === "입금 확인 대기") return;
 
@@ -282,44 +276,42 @@ const confirmGroupDeposit = async (time: string) => {
     setIsDeleteOrderOpen(true); 
   };
 
-// 2. [API 연동] 주문 대기 취소 (DELETE /api/staff/orders/{orderId}?staffId={staffId})
-const executeDeleteGroup = async () => {
-  if (!timeToDelete) return; 
-  
-  const groupOrders = orders.filter(o => o.time === timeToDelete && o.status === "입금 확인 대기");
-  const uniqueOrderIds = Array.from(new Set(groupOrders.map(o => o.orderId)));
-
-  try {
-    const results = await Promise.all(
-      uniqueOrderIds.map(async (orderId) => {
-        const response = await staffFetch(`/api/staff/orders/${orderId}`, {
-          method: "DELETE",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ reason: deleteReason }),
-        });
-
-        if (!response.ok) throw new Error("서버 응답 오류");
-        return response.json();
-      })
-    );
-
-    // 화면에서 취소된 주문 타임라인 통째로 제거
-    setOrders(prev => prev.filter(order => order.time !== timeToDelete));
+  // 2. [API 연동] 주문 대기 취소
+  const executeDeleteGroup = async () => {
+    if (!timeToDelete) return; 
     
-    // 모달 초기화 및 닫기
-    setIsDeleteOrderOpen(false); 
-    setTimeToDelete(null); 
-    setDeleteReason(""); 
-    
-    alert("해당 주문이 성공적으로 취소되었습니다.");
+    const groupOrders = orders.filter(o => o.time === timeToDelete && o.status === "입금 확인 대기");
+    const uniqueOrderIds = Array.from(new Set(groupOrders.map(o => o.orderId)));
 
-  } catch (e) {
-    console.error(e);
-    alert("주문 취소 실패: 서버와 통신 중 문제가 발생했습니다.");
-  }
-};
+    try {
+      const results = await Promise.all(
+        uniqueOrderIds.map(async (orderId) => {
+          const response = await staffFetch(`/api/staff/orders/${orderId}`, {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ reason: deleteReason }),
+          });
 
-  // [API 연동] 테이블 정리/초기화 (PATCH /api/staff/tables/{tableId}/clear?staffId={staffId})
+          if (!response.ok) throw new Error("서버 응답 오류");
+          return response.json();
+        })
+      );
+
+      setOrders(prev => prev.filter(order => order.time !== timeToDelete));
+      
+      setIsDeleteOrderOpen(false); 
+      setTimeToDelete(null); 
+      setDeleteReason(""); 
+      
+      alert("해당 주문이 성공적으로 취소되었습니다.");
+
+    } catch (e) {
+      console.error(e);
+      alert("주문 취소 실패: 서버와 통신 중 문제가 발생했습니다.");
+    }
+  };
+
+  // [API 연동] 테이블 정리/초기화
   const handleResetTable = async () => {
     if (!tableId) return;
 
@@ -521,11 +513,30 @@ const executeDeleteGroup = async () => {
           </div>
           
           <div className="p-4 sm:p-8 bg-slate-900/40 border-t border-white/5 flex flex-col sm:flex-row gap-3">
-            <button onClick={() => { setIsResetOpen(false); setIsDeleteOrderOpen(false); setIsEditTokenOpen(!isEditTokenOpen); setTokenDelta(""); }} className="flex-1 bg-slate-700 hover:bg-slate-600 text-white py-4 sm:py-6 rounded-2xl font-black text-lg sm:text-xl flex items-center justify-center gap-3 active:scale-95 transition-all">
-              <Coins size={20} className="text-yellow-500" /> 토큰 수량 증감
+            <button 
+              disabled={isEmptyTable}
+              onClick={() => { setIsResetOpen(false); setIsDeleteOrderOpen(false); setIsEditTokenOpen(!isEditTokenOpen); setTokenDelta(""); }} 
+              className={`flex-1 py-4 sm:py-6 rounded-2xl font-black text-lg sm:text-xl flex items-center justify-center gap-3 transition-all ${
+                isEmptyTable 
+                  ? "bg-slate-800 text-slate-600 cursor-not-allowed opacity-50" 
+                  : "bg-slate-700 hover:bg-slate-600 text-white active:scale-95"
+              }`}
+            >
+              <Coins size={20} className={isEmptyTable ? "text-slate-600" : "text-yellow-500"} /> 
+              토큰 수량 증감
             </button>
-            <button onClick={() => { setIsEditTokenOpen(false); setIsDeleteOrderOpen(false); setIsResetOpen(!isResetOpen); }} className="flex-1 bg-orange-600 hover:bg-orange-500 text-white py-4 sm:py-6 rounded-2xl font-black text-lg sm:text-xl flex items-center justify-center gap-3 active:scale-95 transition-all">
-              <RotateCcw size={20} /> 테이블 초기화
+            
+            <button 
+              disabled={isEmptyTable}
+              onClick={() => { setIsEditTokenOpen(false); setIsDeleteOrderOpen(false); setIsResetOpen(!isResetOpen); }} 
+              className={`flex-1 py-4 sm:py-6 rounded-2xl font-black text-lg sm:text-xl flex items-center justify-center gap-3 transition-all ${
+                isEmptyTable 
+                  ? "bg-slate-800 text-slate-600 cursor-not-allowed opacity-50" 
+                  : "bg-orange-600 hover:bg-orange-500 text-white active:scale-95 shadow-lg shadow-orange-900/20"
+              }`}
+            >
+              <RotateCcw size={20} /> 
+              테이블 초기화
             </button>
           </div>
         </motion.div>
