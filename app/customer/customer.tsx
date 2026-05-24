@@ -183,26 +183,37 @@ export default function OrderPage() {
   const submitOrder = async () => {
     if (!qrToken || cart.length === 0) return;
     setIsLoading(true);
-
+  
     try {
       const payload = {
         qrToken: qrToken,
         items: cart.map(item => ({ menuId: item.menuId, quantity: item.quantity }))
       };
-
+  
       const response = await fetch(`${API_BASE_URL}/orders`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
-
+  
       const result = await response.json();
-
+  
       if (result.success) {
+        // 성공 시 처리
         setStep('CALL_SENT');
         setCart([]);
       } else {
-        alert(result.message || "주문 처리 중 오류가 발생했습니다.");
+        // 💡 실패 시 처리: 400 에러 및 MENU_SOLD_OUT 분기 처리
+        if (response.status === 400 && result.code === 'MENU_SOLD_OUT') {
+          alert("죄송합니다. 담으신 메뉴 중 방금 품절된 상품이 있습니다.\n장바구니를 다시 확인해 주세요.");
+          
+          // UX 개선: 사용자가 바로 장바구니를 수정할 수 있도록 메뉴판/장바구니 화면으로 돌려보냄
+          setStep('MENU');
+          setIsCartOpen(true);
+        } else {
+          // 그 외의 일반적인 오류 처리
+          alert(result.message || "주문 처리 중 오류가 발생했습니다.");
+        }
       }
     } catch (error) {
       alert("서버와 통신하는 중 에러가 발생했습니다.");
