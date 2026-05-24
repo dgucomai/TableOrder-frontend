@@ -276,13 +276,17 @@ export default function StaffMenuPage() {
         <div className="mx-auto max-w-6xl p-4 md:p-6 space-y-6">
           <section className="rounded-[2rem] border border-slate-800 bg-[#1e293b] overflow-hidden shadow-2xl">
             <div className="flex flex-col md:flex-row gap-6 p-5 md:p-8 border-b border-white/5 bg-slate-800/40">
+              
               {/* 이미지 및 우측 하단 가격 배지 */}
               <div className="relative w-full md:w-56 h-48 md:h-56 shrink-0">
                 {selectedMenu.imageUrl ? (
                   <img
                     src={selectedMenu.imageUrl}
                     alt={selectedMenu.menuName}
-                    className="w-full h-full rounded-3xl object-cover bg-slate-900"
+                    // 품절일 경우 이미지 살짝 블러 처리 및 어둡게 변경
+                    className={`w-full h-full rounded-3xl object-cover bg-slate-900 transition-all ${
+                      selectedMenu.isSoldOut ? "blur-[2px] brightness-75" : ""
+                    }`}
                   />
                 ) : (
                   <div className="w-full h-full rounded-3xl bg-slate-800 flex flex-col items-center justify-center text-slate-500">
@@ -290,7 +294,17 @@ export default function StaffMenuPage() {
                     <span className="text-xs font-bold">이미지 없음</span>
                   </div>
                 )}
-                <div className="absolute bottom-3 right-3 px-4 py-1.5 rounded-full bg-slate-900/90 text-slate-200 text-sm font-black shadow-lg backdrop-blur border border-white/10">
+
+                {/* 품절 상태일 경우 가운데 나타나는 오버레이 */}
+                {selectedMenu.isSoldOut && (
+                  <div className="absolute inset-0 flex items-center justify-center rounded-3xl z-10 pointer-events-none">
+                    <span className="px-6 py-2.5 rounded-2xl bg-black/60 text-white text-lg md:text-xl font-black shadow-xl backdrop-blur-sm border border-white/10">
+                      품절
+                    </span>
+                  </div>
+                )}
+
+                <div className="absolute bottom-3 right-3 px-4 py-1.5 rounded-full bg-slate-900/90 text-slate-200 text-sm font-black shadow-lg backdrop-blur border border-white/10 z-20">
                   {selectedMenu.price.toLocaleString()}원
                 </div>
               </div>
