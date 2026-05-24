@@ -9,7 +9,10 @@ export default function SalesReport() {
   useEffect(() => {
     const fetchSalesData = async () => {
       try {
-        const response = await fetch('/api/admin/sales?staffId=100');
+        const token = localStorage.getItem("accessToken") || "";
+        const response = await fetch('/api/admin/sales', {
+          headers: { "Authorization": `Bearer ${token}` }
+        });
         const result = await response.json();
 
         // 성공 여부에 따라 화면에 띄울 값을 다르게 설정합니다.

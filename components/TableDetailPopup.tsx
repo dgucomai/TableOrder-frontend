@@ -59,7 +59,7 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
 
   const fetchTableDetail = async () => {
     try {
-      const token = localStorage.getItem("staffAccessToken") || "";
+      const token = localStorage.getItem("accessToken") || "";
       const response = await fetch(`/api/staff/tables/${tableId}`, {
         method: "GET",
         headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" }
@@ -141,7 +141,7 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
     
     // [TODO] SSE 연결 주소가 백엔드 명세서에 확정되면 활성화하세요.
     /*
-    const token = localStorage.getItem("staffAccessToken") || "";
+    const token = localStorage.getItem("accessToken") || "";
     const eventSource = new EventSource(`/api/sse/staff?token=${token}`);
     
     eventSource.onmessage = (event) => {
@@ -186,13 +186,8 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
     }
 
     try {
-      const token = localStorage.getItem("staffAccessToken") || "";
-      
-      // [TODO] 임시 하드코딩: 나중에 로그인 연동 시 실제 직원 ID로 교체하세요.
-      const staffId = 100;
-
-      // URL에 ?staffId=${staffId} 쿼리 파라미터 추가
-      const response = await fetch(`/api/staff/calls/${call.callId}/resolve?staffId=${staffId}`, {
+      const token = localStorage.getItem("accessToken") || "";
+      const response = await fetch(`/api/staff/calls/${call.callId}/resolve`, {
         method: "PATCH",
         headers: { 
           "Authorization": `Bearer ${token}`,
@@ -225,16 +220,11 @@ const confirmGroupDeposit = async (time: string) => {
   if (uniqueOrderIds.length === 0) return;
 
   try {
-    const tokenStr = localStorage.getItem("staffAccessToken") || "";
-    
-    // [수정된 부분] 임시 하드코딩: 나중에 로그인 연동 시 실제 직원 ID로 교체하세요.
-    const staffId = 100;
+    const tokenStr = localStorage.getItem("accessToken") || "";
 
-    // 여러 개의 주문(orderId)을 동시에 승인 처리
     const results = await Promise.all(
       uniqueOrderIds.map(async (orderId) => {
-        // [수정된 부분] URL에 ?staffId=${staffId} 쿼리 파라미터 추가
-        const response = await fetch(`/api/staff/orders/${orderId}/approve?staffId=${staffId}`, {
+        const response = await fetch(`/api/staff/orders/${orderId}/approve`, {
           method: "PATCH",
           headers: { 
             "Authorization": `Bearer ${tokenStr}`,
@@ -276,7 +266,7 @@ const confirmGroupDeposit = async (time: string) => {
     if (currentStatus === "제공 완료" || currentStatus === "입금 확인 대기") return;
 
     try {
-      const tokenStr = localStorage.getItem("staffAccessToken") || "";
+      const tokenStr = localStorage.getItem("accessToken") || "";
       const response = await fetch(`/api/staff/orders/${orderId}/status`, {
         method: "PATCH",
         headers: { "Authorization": `Bearer ${tokenStr}`, "Content-Type": "application/json" },
@@ -310,15 +300,11 @@ const executeDeleteGroup = async () => {
   const uniqueOrderIds = Array.from(new Set(groupOrders.map(o => o.orderId)));
 
   try {
-    const tokenStr = localStorage.getItem("staffAccessToken") || "";
-    
-    // [수정된 부분] 임시 하드코딩: 로그인 연동 시 실제 직원 ID로 교체하세요.
-    const staffId = 100;
+    const tokenStr = localStorage.getItem("accessToken") || "";
 
     const results = await Promise.all(
       uniqueOrderIds.map(async (orderId) => {
-        // [수정된 부분] URL에 ?staffId=${staffId} 쿼리 파라미터 추가
-        const response = await fetch(`/api/staff/orders/${orderId}?staffId=${staffId}`, {
+        const response = await fetch(`/api/staff/orders/${orderId}`, {
           method: "DELETE",
           headers: { 
             "Authorization": `Bearer ${tokenStr}`,
@@ -353,12 +339,9 @@ const executeDeleteGroup = async () => {
     if (!tableId) return;
 
     try {
-      const tokenStr = localStorage.getItem("staffAccessToken") || "";
-      
-      // [TODO] 임시 하드코딩: 추후 로그인 기능 연동 시 실제 직원 ID를 불러오도록 수정하세요.
-      const staffId = 100; 
+      const tokenStr = localStorage.getItem("accessToken") || "";
 
-      const response = await fetch(`/api/staff/tables/${tableId}/clear?staffId=${staffId}`, {
+      const response = await fetch(`/api/staff/tables/${tableId}/clear`, {
         method: "PATCH",
         headers: { "Authorization": `Bearer ${tokenStr}` }
       });
@@ -385,7 +368,7 @@ const executeDeleteGroup = async () => {
     if (isNaN(deltaValue) || deltaValue === 0) return;
 
     try {
-      const tokenStr = localStorage.getItem("staffAccessToken") || "";
+      const tokenStr = localStorage.getItem("accessToken") || "";
       const response = await fetch(`/api/tokens/${tableId}`, {
         method: "PATCH",
         headers: {
