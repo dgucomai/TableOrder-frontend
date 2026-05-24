@@ -1,13 +1,13 @@
 "use client";
 
 import React, { useMemo, useEffect } from "react";
-import { RefreshCw, Loader2 } from "lucide-react";
+import { Clock, CreditCard, User, RefreshCw, Loader2 } from "lucide-react";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { useInView } from "react-intersection-observer";
-import { staffFetch } from "@/lib/staffFetch"; // JWT가 적용된 fetch 유틸리티
+import { staffFetch } from "@/lib/staffFetch"; // JWT가 포함된 공통 Fetch 함수
 
-// API 응답에 맞춘 로그 아이템 타입 정의
-interface ApiLogItem {
+// API 응답 데이터 타입 정의 (log응답.txt 기준)
+interface LogItem {
   logId: number;
   category: string;
   action: string;
@@ -15,47 +15,32 @@ interface ApiLogItem {
   createdAt: string;
 }
 
-// API 응답 전체 구조 타입
 interface LogApiResponse {
-  success: boolean;
-  data: {
-    logs: ApiLogItem[];
-    cursor: {
-      nextCursor: number | null;
-      hasNext: boolean;
-    };
+  logs: LogItem[];
+  cursor: {
+    nextCursor: number | null;
+    hasNext: boolean;
   };
-  message: string | null;
 }
 
 // 실제 API를 호출할 Fetch 함수 (staffFetch 적용)
-const fetchLogs = async (
-  cursor: number | undefined
-): Promise<LogApiResponse> => {
-  const queryParams = new URLSearchParams();
+const fetchLogs = async (cursor?: number): Promise<LogApiResponse> => {
+  const url = cursor ? `/api/admin/logs?cursor=${cursor}` : "/api/admin/logs";
+  const res = await staffFetch(url);
   
-  // cursor가 존재하면 파라미터에 추가 (첫 요청 시에는 undefined)
-  if (cursor !== undefined) {
-    queryParams.append("cursor", cursor.toString());
-  }
-
-  const queryString = queryParams.toString() ? `?${queryParams.toString()}` : "";
-  const res = await staffFetch(`/api/admin/logs${queryString}`);
-  
+  if (!res.ok) throw new Error("네트워크 응답이 올바르지 않습니다.");
   const result = await res.json();
   
-  if (!result.success) {
-    throw new Error(result.message || "네트워크 응답이 올바르지 않습니다.");
-  }
+  if (!result.success) throw new Error(result.message || "데이터를 불러오는 중 오류가 발생했습니다.");
   
-  return result;
+  return result.data;
 };
 
 export default function StaffLogPage() {
-  // 무한 스크롤 감지를 위한 옵저버 훅
+  // 무한 스크롤 감지를 위한 옵저버 훅 (스크롤 맨 아래 도달 시 inView가 true가 됨)
   const { ref, inView } = useInView();
 
-  // TanStack Query: 커서 기반 무한 스크롤 적용 (필터 관련 의존성 제거)
+  // TanStack Query: 커서 기반 무한 스크롤 훅 적용
   const {
     data,
     fetchNextPage,
@@ -65,33 +50,30 @@ export default function StaffLogPage() {
     isFetching,
     status
   } = useInfiniteQuery({
-    queryKey: ["adminLogs"],
-    // pageParam이 바로 cursor 값 역할을 합니다.
+    queryKey: ["adminLogs"], 
     queryFn: ({ pageParam }) => fetchLogs(pageParam as number | undefined),
-    initialPageParam: undefined as number | undefined, // 첫 요청 시 cursor는 없음
+    initialPageParam: undefined as number | undefined,
     getNextPageParam: (lastPage) => {
-      // API 응답의 hasNext가 true일 때만 nextCursor를 반환
-      if (lastPage.data.cursor.hasNext) {
-        return lastPage.data.cursor.nextCursor;
-      }
-      return undefined; // undefined를 반환하면 더 이상 데이터를 불러오지 않음
+      // hasNext가 true일 때만 nextCursor를 다음 페이지 파라미터로 넘김
+      return lastPage.cursor.hasNext ? lastPage.cursor.nextCursor : undefined;
     },
   });
 
-  // 스크롤이 맨 아래(ref)에 닿았고, 다음 페이지가 존재하며, 로딩 중이 아닐 때 다음 데이터 호출
+  // 스크롤이 맨 아래(ref)에 닿았고, 다음 페이지가 존재하며, 현재 로딩 중이 아닐 때 다음 데이터 호출
   useEffect(() => {
     if (inView && hasNextPage && !isFetchingNextPage) {
       fetchNextPage();
     }
   }, [inView, hasNextPage, isFetchingNextPage, fetchNextPage]);
 
-  // 각 페이지(pages) 안에 있는 logs 배열을 1차원 배열로 펼침(flatMap)
+  // pages 배열(2차원)을 하나의 배열(1차원)로 평탄화(flatMap)하여 통합
   const logs = useMemo(() => {
-    return data?.pages.flatMap((page) => page.data.logs) || [];
+    return data?.pages.flatMap((page) => page.logs) || [];
   }, [data]);
 
-  // UI용 임시 스타일 함수 (응답 action 기반으로 수정 필요)
-  const getLogStyle = (action: string) => { return { card: "" }; };
+  // 기존에 사용하시던 로직 유지 (데이터의 action 또는 category를 기준으로 스타일링 변경 필요 시 수정)
+  const getLogStyle = (action: string) => { return { card: "" }; /* 기존 로직 동일하게 적용 */ };
+  const getLogIcon = (action: string) => { /* 기존 로직 동일하게 적용 */ };
 
   return (
     <div className="min-h-full bg-[#0f172a] px-3 py-4 sm:px-6 lg:px-10">
@@ -99,37 +81,35 @@ export default function StaffLogPage() {
         
         {/* 로그 목록 섹션 */}
         <section className="rounded-3xl border border-slate-800 bg-[#1e293b]/70 p-3 sm:p-5">
-          <div className="mb-3 flex items-center justify-between">
-            <div>
-              <h2 className="text-base font-black text-white sm:text-xl flex items-center gap-2">
-                전체 운영 기록
-                
-                {/* 🔄 새로고침 버튼 (클릭 시 refetch 호출) */}
-                <button
-                  onClick={() => refetch()}
-                  disabled={isFetching}
-                  className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors disabled:opacity-50"
-                  title="새로고침"
-                >
-                  <RefreshCw size={16} className={isFetching ? "animate-spin text-orange-500" : ""} />
-                </button>
-              </h2>
-              <p className="mt-1 text-[11px] font-medium text-slate-500 sm:text-xs">
-                최근 발생한 기록이 위에 표시됩니다.
-              </p>
+          <div className="mb-3">
+            <div className="flex w-full items-center justify-between">
+              <div>
+                <h2 className="text-base font-black text-white sm:text-xl">
+                  전체 운영 기록
+                </h2>
+                <p className="mt-1 text-[11px] font-medium text-slate-500 sm:text-xs">
+                  최근 발생한 기록이 위에 표시됩니다.
+                </p>
+              </div>
+              
+              {/* 🔄 맨 우측에 배치된 새로고침 버튼 */}
+              <button
+                onClick={() => refetch()}
+                disabled={isFetching}
+                className="ml-auto flex items-center gap-1.5 rounded-lg bg-slate-800 px-3 py-1.5 text-slate-300 transition-colors hover:bg-slate-700 disabled:opacity-50"
+                title="새로고침"
+              >
+                <RefreshCw size={16} className={isFetching ? "animate-spin text-orange-500" : ""} />
+                <span className="hidden text-xs font-bold sm:inline">새로고침</span>
+              </button>
             </div>
           </div>
 
           {/* 로딩/결과 렌더링 */}
           {status === "pending" ? (
             <div className="flex min-h-[200px] flex-col items-center justify-center rounded-2xl border border-dashed border-slate-700 bg-slate-900/50 p-5">
-              <Loader2 className="animate-spin text-orange-500 mb-2" size={24} />
+              <Loader2 className="mb-2 animate-spin text-orange-500" size={24} />
               <p className="text-sm font-black text-slate-400">데이터를 불러오는 중입니다...</p>
-            </div>
-          ) : status === "error" ? (
-            <div className="flex min-h-[200px] flex-col items-center justify-center rounded-2xl border border-dashed border-red-900/50 bg-red-900/20 p-5">
-              <p className="text-sm font-black text-red-400">데이터를 불러오는 중 오류가 발생했습니다.</p>
-              <button onClick={() => refetch()} className="mt-3 text-xs text-red-300 underline">다시 시도</button>
             </div>
           ) : logs.length === 0 ? (
             <div className="flex min-h-[200px] flex-col items-center justify-center rounded-2xl border border-dashed border-slate-700 bg-slate-900/50 p-5 text-center">
@@ -138,27 +118,29 @@ export default function StaffLogPage() {
           ) : (
             <div className="space-y-2.5">
               {logs.map((log) => {
-                const style = getLogStyle(log.action);
+                const style = getLogStyle(log.action); // 기존 로직을 action이나 category에 맞게 수정
                 return (
-                  // logId를 key로 사용
-                  <article key={log.logId} className={`rounded-2xl border border-slate-700 bg-slate-800 p-3 transition-all hover:border-white/20 sm:p-4 ${style?.card}`}>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-bold text-slate-400 px-2 py-1 bg-slate-900 rounded-md">
-                        {log.category} | {log.action}
-                      </span>
-                      <span className="text-xs text-slate-500">
-                        {new Date(log.createdAt).toLocaleString()}
+                  <article key={log.logId} className={`rounded-2xl border p-3 transition-all hover:border-white/20 sm:p-4 ${style?.card}`}>
+                    <div className="flex items-start justify-between">
+                      <div>
+                        {/* API 응답 메세지 및 생성일 바인딩 */}
+                        <p className="text-sm font-bold text-white">{log.message}</p>
+                        <p className="mt-1 text-xs text-slate-400">
+                          {new Date(log.createdAt).toLocaleString("ko-KR", { 
+                            month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit"
+                          })}
+                        </p>
+                      </div>
+                      <span className="rounded bg-slate-800 px-2 py-1 text-[10px] font-bold text-slate-400">
+                        {log.category}
                       </span>
                     </div>
-                    <p className="text-sm text-white font-medium break-keep">
-                      {log.message}
-                    </p>
                   </article>
                 );
               })}
               
-              {/* 무한 스크롤 트리거 요소 */}
-              <div ref={ref} className="h-10 flex items-center justify-center py-4">
+              {/* 무한 스크롤 트리거 요소 (여기에 도달하면 다음 커서 호출) */}
+              <div ref={ref} className="flex h-10 items-center justify-center py-4">
                 {isFetchingNextPage ? (
                   <Loader2 className="animate-spin text-slate-400" size={20} />
                 ) : hasNextPage ? (

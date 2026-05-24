@@ -61,7 +61,7 @@ const getStatusConfig = (status: OrderStatus) => {
       };
     case 'REJECTED':
       return { 
-        text: "주문 거절", 
+        text: "승인 거절", 
         color: "text-pink-500", 
         bg: "bg-pink-100", 
         icon: <AlertCircle size={16} /> 
