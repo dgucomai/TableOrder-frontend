@@ -215,7 +215,7 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
     }
   };
 
-// 1. [API 연동] 입금 대기 승인 (PATCH /api/staff/orders/{orderId}/approve)
+// 1. [API 연동] 입금 대기 승인 (PATCH /api/staff/orders/{orderId}/approve?staffId={staffId})
 const confirmGroupDeposit = async (time: string) => {
   // 같은 시간에 주문된 항목 중 '입금 확인 대기' 상태인 주문들만 필터링
   const groupOrders = groupedOrders[time].filter((o: Order) => o.status === "입금 확인 대기");
@@ -227,10 +227,14 @@ const confirmGroupDeposit = async (time: string) => {
   try {
     const tokenStr = localStorage.getItem("staffAccessToken") || "";
     
+    // [수정된 부분] 임시 하드코딩: 나중에 로그인 연동 시 실제 직원 ID로 교체하세요.
+    const staffId = 100;
+
     // 여러 개의 주문(orderId)을 동시에 승인 처리
     const results = await Promise.all(
       uniqueOrderIds.map(async (orderId) => {
-        const response = await fetch(`/api/staff/orders/${orderId}/approve`, {
+        // [수정된 부분] URL에 ?staffId=${staffId} 쿼리 파라미터 추가
+        const response = await fetch(`/api/staff/orders/${orderId}/approve?staffId=${staffId}`, {
           method: "PATCH",
           headers: { 
             "Authorization": `Bearer ${tokenStr}`,
@@ -298,7 +302,7 @@ const confirmGroupDeposit = async (time: string) => {
     setIsDeleteOrderOpen(true); 
   };
 
-// 2. [API 연동] 주문 대기 취소 (DELETE /api/staff/orders/{orderId})
+// 2. [API 연동] 주문 대기 취소 (DELETE /api/staff/orders/{orderId}?staffId={staffId})
 const executeDeleteGroup = async () => {
   if (!timeToDelete) return; 
   
@@ -308,15 +312,18 @@ const executeDeleteGroup = async () => {
   try {
     const tokenStr = localStorage.getItem("staffAccessToken") || "";
     
+    // [수정된 부분] 임시 하드코딩: 로그인 연동 시 실제 직원 ID로 교체하세요.
+    const staffId = 100;
+
     const results = await Promise.all(
       uniqueOrderIds.map(async (orderId) => {
-        const response = await fetch(`/api/staff/orders/${orderId}`, {
+        // [수정된 부분] URL에 ?staffId=${staffId} 쿼리 파라미터 추가
+        const response = await fetch(`/api/staff/orders/${orderId}?staffId=${staffId}`, {
           method: "DELETE",
           headers: { 
             "Authorization": `Bearer ${tokenStr}`,
             "Content-Type": "application/json"
           },
-          // 백엔드에서 사유를 받을 수도 있으므로 body에 담아줍니다. (백엔드 스펙에 따라 무시될 수도 있음)
           body: JSON.stringify({ reason: deleteReason })
         });
 
@@ -324,10 +331,6 @@ const executeDeleteGroup = async () => {
         return response.json();
       })
     );
-
-    // (선택 사항) API 응답 결과에서 success 체크를 엄격히 하고 싶다면 활성화
-    // const allSuccess = results.every(result => result.success);
-    // if (!allSuccess) throw new Error("취소 실패");
 
     // 화면에서 취소된 주문 타임라인 통째로 제거
     setOrders(prev => prev.filter(order => order.time !== timeToDelete));
