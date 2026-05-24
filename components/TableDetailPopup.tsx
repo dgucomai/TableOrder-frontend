@@ -159,11 +159,12 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
   useSseEvent("PAYMENT_REQUEST_CREATED", ({ tableId: id }: any) => {
     if (id === tableId) fetchTableDetail();
   });
-  useSseEvent("ORDER_APPROVED", ({ tableId: id, orderId }: any) => {
+  useSseEvent("ORDER_APPROVED", ({ tableId: id, orderId, orderStatus }: any) => {
     if (id !== tableId) return;
+    const mapped = mapOrderStatus(orderStatus || "COOKING") as Order["orderStatus"];
     setOrders((prev) => prev.map((o) =>
       o.orderId === orderId
-        ? { ...o, orderStatus: "준비 중", itemStatus: "준비 중" }
+        ? { ...o, orderStatus: mapped, itemStatus: mapped }
         : o
     ));
   });
