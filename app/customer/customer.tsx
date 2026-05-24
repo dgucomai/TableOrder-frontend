@@ -33,8 +33,8 @@ const API_BASE_URL = "/api";
 export default function OrderPage() {
   const [qrToken, setQrToken] = useState<string | null>(null);
   const [displayTableNum, setDisplayTableNum] = useState<string | null>(null);
-  const [tableId, setTableId] = useState<number | null>(null); // 🪙 테이블 ID 상태 추가
-  const [currentTokenCount, setCurrentTokenCount] = useState<number>(0); // 🪙 현재 보유 토큰 상태 추가
+  const [tableId, setTableId] = useState<number | null>(null); 
+  const [currentTokenCount, setCurrentTokenCount] = useState<number>(0); 
   
   const [menuList, setMenuList] = useState<MenuItem[]>([]);
   const [categories, setCategories] = useState<string[]>(["All"]);
@@ -51,12 +51,10 @@ export default function OrderPage() {
   const [customCallText, setCustomCallText] = useState("");
   const [isCallLoading, setIsCallLoading] = useState(false);
 
-  // 🪙 메뉴 가격 비례 토큰 계산 로직 (1000원당 1개)
   const calculateTokens = (price: number) => {
     return Math.round(price / 1000);
   };
 
-  // 🪙 테이블 보유 토큰 조회 API 호출 함수
   const fetchTokenCount = async (id: number) => {
     try {
       const response = await fetch(`${API_BASE_URL}/tokens/${id}`);
@@ -88,11 +86,9 @@ export default function OrderPage() {
         if (result.success && result.data && result.data.tableNumber) {
           setDisplayTableNum(result.data.tableNumber.toString());
           
-          // API 응답에 tableId가 있다면 사용하고, 없다면 tableNumber를 fallback으로 사용
           const fetchedTableId = result.data.tableId || result.data.tableNumber;
           setTableId(fetchedTableId);
 
-          // 메뉴 데이터와 토큰 데이터를 병렬로 로딩
           await Promise.all([
             fetchMenus(),
             fetchTokenCount(fetchedTableId)
@@ -166,33 +162,28 @@ export default function OrderPage() {
     }
 
     try {
-      // 1. 결제창으로 넘어가기 전 최신 메뉴 상태를 서버에서 다시 불러옵니다.
       const response = await fetch(`${API_BASE_URL}/menus`);
       const result = await response.json();
 
       if (result.success) {
         const latestMenus = result.data.menus;
 
-        // 2. 현재 장바구니에 있는 아이템과 최신 메뉴 데이터를 비교하여 품절된 메뉴를 찾습니다.
         const soldOutItemsInCart = cart.filter(cartItem => {
           const latestMenu = latestMenus.find((m: any) => m.menuId === cartItem.menuId);
-          // 메뉴가 삭제되었거나, isSoldOut 또는 soldOut이 true로 변경된 경우 품절로 간주
           return !latestMenu || latestMenu.isSoldOut === true || latestMenu.soldOut === true;
         });
 
-        // 3. 품절된 메뉴가 장바구니에 포함되어 있다면 알림을 띄우고 다음 단계로 넘어가는 것을 막습니다.
         if (soldOutItemsInCart.length > 0) {
           const soldOutNames = soldOutItemsInCart.map(item => item.menuName).join(', ');
           alert(`죄송합니다. 담으신 메뉴 중 방금 품절된 상품이 있습니다:\n[${soldOutNames}]\n장바구니를 다시 확인해 주세요.`);
           
-          // 사용자가 품절 상태를 바로 볼 수 있도록 전체 메뉴 리스트 상태도 최신화해줍니다.
           const fetchedMenus = latestMenus.map((m: any) => ({
             ...m,
             soldOut: m.isSoldOut !== undefined ? m.isSoldOut : m.soldOut
           }));
           setMenuList(fetchedMenus);
           
-          return; // PAYMENT 단계로 넘어가지 않고 함수 종료
+          return; 
         }
       } else {
         alert("최신 메뉴 정보를 확인하지 못했습니다. 다시 시도해주세요.");
@@ -204,7 +195,6 @@ export default function OrderPage() {
       return;
     }
 
-    // 4. 품절된 메뉴가 없다면 정상적으로 결제 단계로 넘어갑니다.
     setIsCartOpen(false); 
     setStep('PAYMENT');   
   };
@@ -240,19 +230,14 @@ export default function OrderPage() {
       const result = await response.json();
   
       if (result.success) {
-        // 성공 시 처리
         setStep('CALL_SENT');
         setCart([]);
       } else {
-        // 💡 실패 시 처리: 400 에러 및 MENU_SOLD_OUT 분기 처리
         if (!response.ok && result.message === '400 MENU_SOLD_OUT') {
           alert("죄송합니다. 담으신 메뉴 중 방금 품절된 상품이 있습니다.\n장바구니를 다시 확인해 주세요.");
-          
-          // UX 개선: 사용자가 바로 장바구니를 수정할 수 있도록 메뉴판/장바구니 화면으로 돌려보냄
           setStep('MENU');
           setIsCartOpen(true);
         } else {
-          // 그 외의 일반적인 오류 처리
           alert(result.message || "주문 처리 중 오류가 발생했습니다.");
         }
       }
@@ -303,21 +288,20 @@ export default function OrderPage() {
       {/* 🔄 로딩 화면 */}
       {step === 'LOADING' && (
         <div className="fixed inset-0 bg-white flex flex-col items-center justify-center p-8 z-50">
-          <div className="w-10 h-10 border-4 border-orange-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-          <p className="text-gray-500 font-bold text-sm">테이블 정보를 확인하고 있습니다...</p>
+          <div className="w-10 h-10 border-4 border-orange-500 border-t-transparent rounded-full animate-spin mb-4 shrink-0"></div>
+          <p className="text-gray-500 font-bold text-sm whitespace-nowrap">테이블 정보를 확인하고 있습니다...</p>
         </div>
       )}
 
       {/* 🚫 접근 거부 화면 */}
       {step === 'ACCESS_DENIED' && (
         <div className="fixed inset-0 bg-white flex flex-col items-center justify-center p-8 z-50">
-          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-6">
+          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-6 shrink-0">
             <X className="text-red-600" size={32} />
           </div>
-          <h2 className="text-2xl font-black text-gray-900 mb-2 text-center">유효하지 않은 테이블입니다</h2>
-          <p className="text-gray-500 text-center mb-8 text-sm leading-relaxed">
-            토큰 정보가 일치하지 않거나 만료되었습니다.<br />
-            매장 직원에게 문의하거나 QR 코드를 다시 스캔해주세요.
+          <h2 className="text-2xl font-black text-gray-900 mb-2 text-center whitespace-nowrap truncate max-w-full">유효하지 않은 테이블입니다</h2>
+          <p className="text-gray-500 text-center mb-8 text-sm leading-relaxed whitespace-nowrap truncate max-w-full">
+            토큰 정보가 일치하지 않거나 만료되었습니다. 매장 직원에게 문의해주세요.
           </p>
         </div>
       )}
@@ -327,26 +311,25 @@ export default function OrderPage() {
         <>
           <div className="sticky top-0 z-30 flex flex-col bg-white">
             <header className="px-4 py-3 flex justify-between items-center shadow-sm">
-              <div>
-                <h1 className="text-lg font-extrabold text-orange-600 tracking-tight">CAISINO ORDER</h1>
-                {/* 🪙 상단 타이틀 아래에 테이블 번호와 함께 보유 토큰 표시 */}
+              <div className="min-w-0 flex-1 mr-2">
+                <h1 className="text-lg font-extrabold text-orange-600 tracking-tight whitespace-nowrap truncate">CAISINO ORDER</h1>
                 <div className="flex items-center gap-2 mt-0.5">
-                  <p className="text-xs font-bold text-gray-700">
+                  <p className="text-xs font-bold text-gray-700 whitespace-nowrap shrink-0">
                     {displayTableNum}번 테이블
                   </p>
-                  <span className="text-[10px] bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded-md font-bold">
+                  <span className="text-[10px] bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded-md font-bold whitespace-nowrap shrink-0">
                     보유 🪙 {currentTokenCount}개
                   </span>
                 </div>
               </div>
-              <div className="flex items-center gap-1">
-                <button onClick={() => setIsCallModalOpen(true)} className="p-2 text-orange-600 hover:bg-orange-50 rounded-full transition-colors flex flex-col items-center justify-center">
-                  <BellRing className="w-6 h-6" />
+              <div className="flex items-center gap-1 shrink-0">
+                <button onClick={() => setIsCallModalOpen(true)} className="p-2 text-orange-600 hover:bg-orange-50 rounded-full transition-colors flex flex-col items-center justify-center whitespace-nowrap shrink-0">
+                  <BellRing className="w-6 h-6 shrink-0" />
                   <span className="text-[10px] font-bold mt-0.5">호출</span>
                 </button>
-                <Link href={`/customer/orders?qt=${qrToken || ""}`} className="p-2 text-gray-700 hover:bg-gray-100 rounded-full transition-colors">
-                  <ReceiptText className="w-6 h-6" />
-                  <span className="text-[10px] font-bold mt-0.5"> 내역</span>
+                <Link href={`/customer/orders?qt=${qrToken || ""}`} className="p-2 text-gray-700 hover:bg-gray-100 rounded-full transition-colors flex flex-col items-center justify-center whitespace-nowrap shrink-0">
+                  <ReceiptText className="w-6 h-6 shrink-0" />
+                  <span className="text-[10px] font-bold mt-0.5">내역</span>
                 </Link>
               </div>
             </header>
@@ -355,7 +338,7 @@ export default function OrderPage() {
                 <button 
                   key={cat} 
                   onClick={() => setActiveCategory(cat)} 
-                  className={`px-4 py-1.5 rounded-full text-sm font-semibold whitespace-nowrap transition-colors ${activeCategory === cat ? "bg-gray-800 text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}
+                  className={`px-4 py-1.5 rounded-full text-sm font-semibold whitespace-nowrap shrink-0 transition-colors ${activeCategory === cat ? "bg-gray-800 text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}
                 >
                   {cat}
                 </button>
@@ -365,7 +348,7 @@ export default function OrderPage() {
 
           <main className="bg-white">
             {filteredMenu.length === 0 ? (
-              <div className="flex justify-center items-center h-40 text-gray-400">
+              <div className="flex justify-center items-center h-40 text-gray-400 whitespace-nowrap">
                 메뉴를 불러오는 중이거나 메뉴가 없습니다.
               </div>
             ) : (
@@ -377,34 +360,35 @@ export default function OrderPage() {
                       {item.imageUrl ? (
                         <img src={item.imageUrl} alt={item.menuName} className="w-24 h-24 rounded-xl object-cover shrink-0 bg-gray-100" />
                       ) : (
-                        <div className="w-24 h-24 rounded-xl shrink-0 bg-gray-200 flex items-center justify-center text-xs text-gray-400">No Image</div>
+                        <div className="w-24 h-24 rounded-xl shrink-0 bg-gray-200 flex items-center justify-center text-xs text-gray-400 whitespace-nowrap">No Image</div>
                       )}
                       
-                      <div className="flex-1 flex flex-col justify-between py-1">
-                        <div>
-                          <div className="flex justify-between items-start">
-                            <h3 className="font-bold text-gray-900 leading-tight">{item.menuName}</h3>
-                            {item.soldOut && <span className="text-[10px] bg-red-100 text-red-600 px-2 py-1 rounded font-bold">품절</span>}
+                      <div className="flex-1 flex flex-col justify-between py-1 min-w-0">
+                        <div className="min-w-0">
+                          <div className="flex justify-between items-start gap-2">
+                            <h3 className="font-bold text-gray-900 leading-tight truncate">{item.menuName}</h3>
+                            {item.soldOut && <span className="text-[10px] bg-red-100 text-red-600 px-2 py-1 rounded font-bold whitespace-nowrap shrink-0">품절</span>}
                           </div>
-                          <p className="text-xs text-gray-400 mt-1 line-clamp-2">{item.description}</p>
+                          {/* 기존 line-clamp 대신 truncate 적용으로 무조건 한줄 유지 */}
+                          <p className="text-xs text-gray-400 mt-1 truncate">{item.description}</p>
                         </div>
-                        <div className="flex justify-between items-end mt-2">
-                          <div className="flex items-center gap-2">
+                        <div className="flex justify-between items-end mt-2 gap-2">
+                          <div className="flex items-center gap-1.5 shrink-0 whitespace-nowrap">
                             <span className="font-bold text-gray-900">{item.price.toLocaleString()}원</span>
                             <span className="text-[10px] bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded-md font-bold">
-                              🪙 {calculateTokens(item.price)}개
+                              🪙 +{calculateTokens(item.price)}개
                             </span>
                           </div>
                           
                           {!item.soldOut && (
                             cartItem ? (
-                              <div className="flex items-center bg-gray-50 rounded-lg border border-gray-200">
-                                <button onClick={() => removeFromCart(item.menuId)} className="p-1.5 text-gray-500 hover:text-gray-900 transition-colors"><Minus size={16} strokeWidth={3} /></button>
-                                <span className="w-6 text-center text-sm font-bold text-gray-800">{cartItem.quantity}</span>
-                                <button onClick={() => addToCart(item)} className="p-1.5 text-gray-500 hover:text-gray-900 transition-colors"><Plus size={16} strokeWidth={3} /></button>
+                              <div className="flex items-center bg-gray-50 rounded-lg border border-gray-200 shrink-0">
+                                <button onClick={() => removeFromCart(item.menuId)} className="p-1.5 text-gray-500 hover:text-gray-900 transition-colors shrink-0"><Minus size={16} strokeWidth={3} /></button>
+                                <span className="w-6 text-center text-sm font-bold text-gray-800 whitespace-nowrap">{cartItem.quantity}</span>
+                                <button onClick={() => addToCart(item)} className="p-1.5 text-gray-500 hover:text-gray-900 transition-colors shrink-0"><Plus size={16} strokeWidth={3} /></button>
                               </div>
                             ) : (
-                              <button onClick={() => addToCart(item)} className="bg-orange-50 text-orange-600 px-4 py-2 rounded-lg text-xs font-bold hover:bg-orange-100">담기</button>
+                              <button onClick={() => addToCart(item)} className="bg-orange-50 text-orange-600 px-4 py-2 rounded-lg text-xs font-bold hover:bg-orange-100 whitespace-nowrap shrink-0">담기</button>
                             )
                           )}
                         </div>
@@ -413,7 +397,7 @@ export default function OrderPage() {
                   );
                 })}
                 <div className="py-8 pb-12 flex justify-center items-center">
-                  <p className="text-xs text-gray-400 font-medium bg-gray-50 px-4 py-2 rounded-lg">
+                  <p className="text-[10px] text-gray-400 font-medium bg-gray-50 px-4 py-2 rounded-lg whitespace-nowrap truncate max-w-[90%]">
                     ✨ 모든 메뉴 이미지는 AI로 만든 참고용 사진 입니다.
                   </p>
                 </div>
@@ -427,42 +411,42 @@ export default function OrderPage() {
       {step === 'PAYMENT' && (
         <div className="fixed inset-0 z-50 bg-black/60 flex items-end">
           <div className="bg-white w-full rounded-t-[32px] p-8 animate-in slide-in-from-bottom duration-300">
-            <h2 className="text-2xl text-black font-black mb-6">입금 정보를 확인해주세요</h2>
+            <h2 className="text-2xl text-black font-black mb-6 whitespace-nowrap truncate">입금 정보를 확인해주세요</h2>
             <div className="space-y-4 mb-8">
               <div className="bg-gray-50 p-5 rounded-2xl border">
-                <div className="flex justify-between items-end mb-1">
-                  <p className="text-gray-500 text-sm">총 입금액</p>
-                  <p className="text-orange-600 text-sm font-bold bg-orange-100 px-2 py-0.5 rounded-lg">
+                <div className="flex justify-between items-end mb-1 gap-2">
+                  <p className="text-gray-500 text-sm whitespace-nowrap shrink-0">총 입금액</p>
+                  <p className="text-orange-600 text-xs font-bold bg-orange-100 px-2 py-0.5 rounded-lg whitespace-nowrap truncate">
                     주문 완료시 🪙 {totalTokens}개 획득
                   </p>
                 </div>
-                <p className="text-3xl font-black text-orange-600">{totalPrice.toLocaleString()}원</p>
+                <p className="text-3xl font-black text-orange-600 whitespace-nowrap truncate">{totalPrice.toLocaleString()}원</p>
               </div>
               <div className="bg-gray-50 p-5 rounded-2xl border">
-                <p className="text-gray-500 text-sm mb-1">입금 계좌</p>
-                <div className="flex justify-between items-center">
-                  <div>
-                    <p className="text-lg text-gray-800 font-bold">IBK기업은행 98215102201013</p>
-                    <p className="text-sm text-gray-500">예금주: 손승현</p>
+                <p className="text-gray-500 text-sm mb-1 whitespace-nowrap">입금 계좌</p>
+                <div className="flex justify-between items-center gap-2">
+                  <div className="min-w-0">
+                    <p className="text-base text-gray-800 font-bold truncate">IBK기업은행 98215102201013</p>
+                    <p className="text-sm text-gray-500 whitespace-nowrap">예금주: 손승현</p>
                   </div>
                   <button
                     onClick={handleCopyAccount}
-                    className="px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gray-50 active:bg-gray-100 transition-colors shadow-sm"
+                    className="px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gray-50 active:bg-gray-100 transition-colors shadow-sm whitespace-nowrap shrink-0"
                   >
                     {isCopied ? "복사완료✓" : "복사하기"}
                   </button>
                 </div>
               </div>
             </div>
-            <div className="flex justify-center items-center font-extrabold text-orange-600 tracking-tight mb-2">입금 완료 후 직원을 호출 해주세요.</div>
+            <div className="flex justify-center items-center font-bold text-orange-600 tracking-tight mb-2 text-sm whitespace-nowrap truncate">입금 완료 후 직원을 호출 해주세요.</div>
             <button 
               onClick={submitOrder}
               disabled={isLoading}
-              className="w-full bg-gray-900 text-white py-5 rounded-2xl font-bold text-xl active:scale-[0.98] transition-transform shadow-lg disabled:bg-gray-400 flex justify-center items-center"
+              className="w-full bg-gray-900 text-white py-5 rounded-2xl font-bold text-lg active:scale-[0.98] transition-transform shadow-lg disabled:bg-gray-400 flex justify-center items-center whitespace-nowrap shrink-0"
             >
               {isLoading ? "요청 중..." : "입금 완료 (주문 등록)"}
             </button>
-            <button disabled={isLoading} onClick={() => setStep('MENU')} className="w-full mt-4 text-gray-400 font-medium py-2">취소하고 돌아가기</button>
+            <button disabled={isLoading} onClick={() => setStep('MENU')} className="w-full mt-4 text-gray-400 font-medium py-2 whitespace-nowrap">취소하고 돌아가기</button>
           </div>
         </div>
       )}
@@ -470,17 +454,16 @@ export default function OrderPage() {
       {/* 3. CALL_SENT 단계 */}
       {step === 'CALL_SENT' && (
         <div className="fixed inset-0 z-[60] bg-white flex flex-col items-center justify-center p-8">
-          <div className="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mb-8">
-            <Bell className="text-green-600 animate-bounce" size={48} />
+          <div className="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mb-8 shrink-0">
+            <Bell className="text-green-600 animate-bounce shrink-0" size={48} />
           </div>
-          <h2 className="text-2xl font-black text-gray-900 mb-4 text-center">주문 접수(입금 확인) 요청 완료!</h2>
-          <p className="text-gray-500 text-center mb-12">
-            직원이 입금을 확인하면<br />
-            자동으로 주문 접수가 완료됩니다.
+          <h2 className="text-xl font-black text-gray-900 mb-4 text-center whitespace-nowrap truncate max-w-full">주문 접수(입금 확인) 요청 완료!</h2>
+          <p className="text-gray-500 text-center mb-12 text-sm whitespace-nowrap truncate max-w-full">
+            직원이 입금을 확인하면 자동으로 접수됩니다.
           </p>
           <button 
             onClick={() => setStep('MENU')}
-            className="w-full max-w-[240px] bg-gray-100 text-gray-600 py-4 rounded-2xl font-bold"
+            className="w-full max-w-[240px] bg-gray-100 text-gray-600 py-4 rounded-2xl font-bold whitespace-nowrap shrink-0"
           >
             메뉴판으로 돌아가기
           </button>
@@ -490,15 +473,15 @@ export default function OrderPage() {
       {/* 하단 플로팅 바 & 장바구니 모달 */}
       {step === 'MENU' && cart.length > 0 && !isCartOpen && (
         <div className="fixed bottom-6 left-4 right-4 z-20">
-          <button onClick={() => setIsCartOpen(true)} className="w-full bg-orange-500 text-white shadow-xl rounded-2xl p-4 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="bg-white text-orange-500 w-8 h-8 rounded-full flex items-center justify-center font-bold">{totalQuantity}</div>
-              <div className="flex flex-col items-start">
-                <span className="font-semibold text-lg leading-tight">{totalPrice.toLocaleString()}원</span>
-                <span className="text-xs font-medium text-orange-100 opacity-90">토큰 획득: 🪙 {totalTokens}개</span>
+          <button onClick={() => setIsCartOpen(true)} className="w-full bg-orange-500 text-white shadow-xl rounded-2xl p-4 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="bg-white text-orange-500 w-8 h-8 rounded-full flex items-center justify-center font-bold shrink-0">{totalQuantity}</div>
+              <div className="flex flex-col items-start min-w-0">
+                <span className="font-semibold text-lg leading-tight whitespace-nowrap truncate">{totalPrice.toLocaleString()}원</span>
+                <span className="text-[11px] font-medium text-orange-100 opacity-90 whitespace-nowrap truncate">토큰 획득: 🪙 {totalTokens}개</span>
               </div>
             </div>
-            <div className="flex items-center font-bold text-lg">장바구니 보기 <ChevronRight size={20} className="ml-1" /></div>
+            <div className="flex items-center font-bold text-base whitespace-nowrap shrink-0">장바구니 <ChevronRight size={20} className="ml-0.5 shrink-0" /></div>
           </button>
         </div>
       )}
@@ -507,39 +490,39 @@ export default function OrderPage() {
       {isCartOpen && (
         <div className="fixed inset-0 z-50 bg-black/60 flex flex-col justify-end">
           <div className="bg-white w-full rounded-t-3xl max-h-[85vh] flex flex-col p-5">
-            <div className="flex justify-between items-center mb-5">
-              <h2 className="text-xl text-gray-900 font-bold">장바구니</h2>
-              <button onClick={() => setIsCartOpen(false)} className="p-2 bg-orange-500 rounded-full text-white"><X size={20} /></button>
+            <div className="flex justify-between items-center mb-5 shrink-0">
+              <h2 className="text-xl text-gray-900 font-bold whitespace-nowrap">장바구니</h2>
+              <button onClick={() => setIsCartOpen(false)} className="p-2 bg-orange-500 rounded-full text-white shrink-0"><X size={20} /></button>
             </div>
-            <div className="overflow-y-auto space-y-5 mb-5">
+            <div className="overflow-y-auto space-y-5 mb-5 pr-1">
               {cart.map(item => (
-                <div key={item.menuId} className="flex justify-between items-center">
-                  <div className="flex-1">
-                    <h4 className="text-black font-bold">{item.menuName}</h4>
-                    <div className="flex items-center gap-2 mt-1">
+                <div key={item.menuId} className="flex justify-between items-center gap-2">
+                  <div className="flex-1 min-w-0">
+                    <h4 className="text-black font-bold truncate">{item.menuName}</h4>
+                    <div className="flex items-center gap-2 mt-1 whitespace-nowrap">
                       <p className="text-sm text-gray-500">{item.price.toLocaleString()}원</p>
                       <span className="text-[10px] bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded-md font-bold">
                         🪙 {calculateTokens(item.price)}개
                       </span>
                     </div>
                   </div>
-                  <div className="flex items-center bg-gray-50 rounded-lg border ml-4">
-                    <button onClick={() => removeFromCart(item.menuId)} className="p-2 text-gray-700"><Minus size={16} /></button>
-                    <span className="w-8 text-center text-gray-900 font-bold">{item.quantity}</span>
-                    <button onClick={() => addToCart(item)} className="p-2 text-gray-700"><Plus size={16} /></button>
+                  <div className="flex items-center bg-gray-50 rounded-lg border ml-2 shrink-0">
+                    <button onClick={() => removeFromCart(item.menuId)} className="p-2 text-gray-700 shrink-0"><Minus size={16} /></button>
+                    <span className="w-8 text-center text-gray-900 font-bold whitespace-nowrap shrink-0">{item.quantity}</span>
+                    <button onClick={() => addToCart(item)} className="p-2 text-gray-700 shrink-0"><Plus size={16} /></button>
                   </div>
                 </div>
               ))}
             </div>
-            <div className="border-t pt-5 pb-8">
-              <div className="flex justify-between items-end mb-4">
-                <div className="flex flex-col">
-                  <span className="text-gray-500 font-medium">총 결제금액</span>
-                  <span className="text-xs text-orange-600 font-bold mt-1">🪙 총 {totalTokens}개 획득 예정</span>
+            <div className="border-t pt-5 pb-8 shrink-0">
+              <div className="flex justify-between items-end mb-4 gap-2">
+                <div className="flex flex-col min-w-0">
+                  <span className="text-gray-500 font-medium whitespace-nowrap">총 결제금액</span>
+                  <span className="text-xs text-orange-600 font-bold mt-1 whitespace-nowrap truncate">🪙 총 {totalTokens}개 획득 예정</span>
                 </div>
-                <span className="text-2xl text-black font-bold">{totalPrice.toLocaleString()}원</span>
+                <span className="text-2xl text-black font-bold whitespace-nowrap shrink-0">{totalPrice.toLocaleString()}원</span>
               </div>
-              <button onClick={handleCheckoutReady} className="w-full py-4 bg-gray-900 text-white rounded-xl font-bold text-lg">결제하기</button>
+              <button onClick={handleCheckoutReady} className="w-full py-4 bg-gray-900 text-white rounded-xl font-bold text-lg whitespace-nowrap shrink-0">결제하기</button>
             </div>
           </div>
         </div>
@@ -549,25 +532,26 @@ export default function OrderPage() {
       {isCallModalOpen && (
         <div className="fixed inset-0 z-[60] bg-black/60 flex flex-col justify-end">
           <div className="bg-white w-full rounded-t-[32px] p-6 animate-in slide-in-from-bottom duration-300">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl text-black font-bold flex items-center gap-3">
-                <BellRing className="text-orange-600" size={24} />
+            <div className="flex justify-between items-center mb-6 shrink-0">
+              <h2 className="text-xl text-black font-bold flex items-center gap-3 whitespace-nowrap">
+                <BellRing className="text-orange-600 shrink-0" size={24} />
                 직원 호출
               </h2>
-              <button onClick={() => setIsCallModalOpen(false)} className="p-2 bg-orange-500 text-white hover:bg-orange-600 rounded-full transition-colors">
+              <button onClick={() => setIsCallModalOpen(false)} className="p-2 bg-orange-500 text-white hover:bg-orange-600 rounded-full transition-colors shrink-0">
                 <X size={20} />
               </button>
             </div>
 
             <div className="space-y-3 mb-6">
-              <p className="text-sm font-bold text-gray-600">어떤 도움이 필요하신가요?</p>
+              <p className="text-sm font-bold text-gray-600 whitespace-nowrap truncate">어떤 도움이 필요하신가요?</p>
               
+              {/* 스크롤 또는 flex-wrap을 사용할 수 있지만 줄바꿈 방지를 요청하셨으므로 가로 스크롤로 변경하거나 랩핑을 유지하되 버튼 내 텍스트 줄바꿈만 막습니다. */}
               <div className="flex flex-wrap gap-2">
                 {CALL_PRESETS.map((preset) => (
                   <button
                     key={preset}
                     onClick={() => setSelectedCall(preset)}
-                    className={`px-4 py-2.5 rounded-xl text-sm font-bold transition-colors border ${
+                    className={`px-4 py-2.5 rounded-xl text-sm font-bold transition-colors border whitespace-nowrap shrink-0 ${
                       selectedCall === preset 
                         ? "bg-orange-50 border-orange-500 text-orange-600" 
                         : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
@@ -586,7 +570,7 @@ export default function OrderPage() {
                     onChange={(e) => setCustomCallText(e.target.value)}
                     maxLength={20}
                     placeholder="필요한 사항을 적어주세요. (20자 이내)"
-                    className="text-black w-full px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 text-sm"
+                    className="text-black w-full px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 text-sm whitespace-nowrap"
                     autoFocus
                   />
                 </div>
@@ -596,7 +580,7 @@ export default function OrderPage() {
             <button
               onClick={submitStaffCall}
               disabled={isCallLoading}
-              className="w-full py-4 bg-gray-900 text-white rounded-2xl font-bold text-lg disabled:bg-gray-400 transition-colors flex justify-center items-center"
+              className="w-full py-4 bg-gray-900 text-white rounded-2xl font-bold text-lg disabled:bg-gray-400 transition-colors flex justify-center items-center whitespace-nowrap shrink-0"
             >
               {isCallLoading ? "호출 중..." : "직원 부르기"}
             </button>
