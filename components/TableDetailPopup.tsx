@@ -35,6 +35,7 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
   const [tokenDelta, setTokenDelta] = useState<string>(""); 
 
   const [startedAt, setStartedAt] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const [isDeleteOrderOpen, setIsDeleteOrderOpen] = useState(false);
   const [timeToDelete, setTimeToDelete] = useState<string | null>(null);
@@ -153,15 +154,17 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
     const timer = setInterval(() => setCurrentTime(new Date()), 60000);
     if (tableId) fetchTableDetail();
     return () => clearInterval(timer);
-  }, [tableId]);
+  }, [tableId, refreshKey]);
+
+  const triggerRefresh = ({ tableId: id }: any) => { if (id === tableId) setRefreshKey((k) => k + 1); };
 
   // SSE 이벤트 구독 — 현재 팝업의 tableId에 해당하는 이벤트만 처리
-  useSseEvent("PAYMENT_REQUEST_CREATED", ({ tableId: id }: any) => { if (id === tableId) fetchTableDetail(); });
-  useSseEvent("STAFF_CALL_CREATED",      ({ tableId: id }: any) => { if (id === tableId) fetchTableDetail(); });
-  useSseEvent("ORDER_APPROVED",          ({ tableId: id }: any) => { if (id === tableId) fetchTableDetail(); });
-  useSseEvent("CALL_RESOLVED",           ({ tableId: id }: any) => { if (id === tableId) fetchTableDetail(); });
-  useSseEvent("TOKEN_UPDATED",           ({ tableId: id }: any) => { if (id === tableId) fetchTableDetail(); });
-  useSseEvent("TABLE_STATUS_CHANGED",    ({ tableId: id }: any) => { if (id === tableId) fetchTableDetail(); });
+  useSseEvent("PAYMENT_REQUEST_CREATED", triggerRefresh);
+  useSseEvent("STAFF_CALL_CREATED",      triggerRefresh);
+  useSseEvent("ORDER_APPROVED",          triggerRefresh);
+  useSseEvent("CALL_RESOLVED",           triggerRefresh);
+  useSseEvent("TOKEN_UPDATED",           triggerRefresh);
+  useSseEvent("TABLE_STATUS_CHANGED",    triggerRefresh);
   useSseEvent("ORDER_REJECTED", ({ tableId: id, orderId }: any) => {
     if (id !== tableId) return;
     setOrders((prev) => prev.filter((o) => o.orderId !== orderId));
