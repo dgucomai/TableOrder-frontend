@@ -1,0 +1,221 @@
+"use client";
+
+import React from "react";
+import { ArrowLeft, Clock, PackageCheck, ImageOff } from "lucide-react";
+import { MenuItem, StaffOrderItem } from "./types";
+import { formatClock, getPreparingOrders, getCompletedOrders } from "./utils";
+
+interface MenuDetailViewProps {
+  menu: MenuItem;
+  orders: StaffOrderItem[];
+  isTogglingSoldOut: boolean;
+  onBackClick: () => void;
+  onToggleSoldOut: () => void;
+}
+
+export default function MenuDetailView({
+  menu,
+  orders,
+  isTogglingSoldOut,
+  onBackClick,
+  onToggleSoldOut,
+}: MenuDetailViewProps) {
+  const selectedPreparingOrders = getPreparingOrders(orders, menu);
+  const selectedCompletedOrders = getCompletedOrders(orders, menu);
+
+  return (
+    <div className="h-full min-h-[calc(100vh-4rem)] bg-[#020617] text-white overflow-y-auto">
+      <div className="sticky top-0 z-40 border-b border-slate-800 bg-[#020617]/95 backdrop-blur px-4 md:px-6 py-3">
+        <div className="mx-auto max-w-6xl flex items-center justify-between gap-3">
+          <button
+            onClick={onBackClick}
+            className="flex items-center gap-2 rounded-2xl bg-slate-900 px-4 py-3 text-sm font-black text-slate-300 hover:bg-orange-500 hover:text-white transition-colors"
+          >
+            <ArrowLeft size={18} /> 메뉴 목록으로 돌아가기
+          </button>
+          <p className="hidden sm:block text-sm font-bold text-slate-500 truncate">
+            {menu.menuName}
+          </p>
+        </div>
+      </div>
+
+      <div className="mx-auto max-w-6xl p-4 md:p-6 space-y-6">
+        <section className="rounded-[2rem] border border-slate-800 bg-[#1e293b] overflow-hidden shadow-2xl">
+          <div className="flex flex-col md:flex-row gap-6 p-5 md:p-8 border-b border-white/5 bg-slate-800/40">
+            {/* 이미지 및 우측 하단 가격 배지 */}
+            <div className="relative w-full md:w-56 h-48 md:h-56 shrink-0">
+              {menu.imageUrl ? (
+                <img
+                  src={menu.imageUrl}
+                  alt={menu.menuName}
+                  className={`w-full h-full rounded-3xl object-cover bg-slate-900 transition-all ${
+                    menu.isSoldOut ? "blur-[2px] brightness-75" : ""
+                  }`}
+                />
+              ) : (
+                <div className="w-full h-full rounded-3xl bg-slate-800 flex flex-col items-center justify-center text-slate-500">
+                  <ImageOff size={32} className="mb-2" />
+                  <span className="text-xs font-bold">이미지 없음</span>
+                </div>
+              )}
+
+              {/* 품절 상태일 경우 가운데 나타나는 오버레이 */}
+              {menu.isSoldOut && (
+                <div className="absolute inset-0 flex items-center justify-center rounded-3xl z-10 pointer-events-none">
+                  <span className="px-6 py-2.5 rounded-2xl bg-black/60 text-white text-lg md:text-xl font-black shadow-xl backdrop-blur-sm border border-white/10">
+                    품절
+                  </span>
+                </div>
+              )}
+
+              <div className="absolute bottom-3 right-3 px-4 py-1.5 rounded-full bg-slate-900/90 text-slate-200 text-sm font-black shadow-lg backdrop-blur border border-white/10 z-20">
+                {menu.price.toLocaleString()}원
+              </div>
+            </div>
+
+            <div className="flex-1 flex flex-col justify-center gap-4">
+              <div>
+                <h1 className="text-3xl md:text-5xl font-black tracking-tighter text-white leading-tight">
+                  {menu.menuName}
+                </h1>
+
+                {/* 품절 토글 버튼 */}
+                <div className="mt-5 flex items-center gap-3">
+                  <button
+                    onClick={onToggleSoldOut}
+                    disabled={isTogglingSoldOut}
+                    className={`px-5 py-2.5 rounded-xl text-sm font-bold transition-all disabled:opacity-50 ${
+                      menu.isSoldOut
+                        ? "bg-slate-700 text-slate-200 hover:bg-slate-600 border border-slate-600"
+                        : "bg-red-500 text-white hover:bg-red-600 shadow-lg shadow-red-500/20"
+                    }`}
+                  >
+                    {isTogglingSoldOut
+                      ? "처리 중..."
+                      : menu.isSoldOut
+                      ? "품절 취소하기"
+                      : "이 메뉴 품절 처리"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="p-5 md:p-8 space-y-8">
+            {/* 준비중 주문 리스트 */}
+            <section>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-black text-white flex items-center gap-2">
+                  <Clock size={22} className="text-orange-500" /> 준비중 주문
+                </h2>
+              </div>
+
+              {selectedPreparingOrders.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-slate-700 bg-slate-900/40 p-8 text-center text-slate-500 font-bold">
+                  현재 대기 중인 주문이 없습니다.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {selectedPreparingOrders.map((order, index) => (
+                    <div
+                      key={order.id}
+                      className="flex flex-col gap-3 rounded-2xl border border-orange-500/20 bg-orange-500/10 p-4 md:p-5"
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 rounded-2xl bg-orange-500 text-white flex items-center justify-center font-black shrink-0">
+                          {index + 1}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-2xl font-black text-white">
+                            {order.tableId}번 테이블
+                          </p>
+                          <p className="text-sm text-orange-200/70 font-bold truncate">
+                            주문번호 {order.orderId}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="rounded-xl bg-slate-950/30 px-4 py-3 text-sm md:text-base font-black text-white whitespace-nowrap overflow-x-auto">
+                        <span className="text-slate-400">주문시간</span>
+                        <span className="mx-2 text-slate-600">|</span>
+                        <span>{formatClock(order.orderedAt, order.time)}</span>
+                        <span className="mx-3 text-slate-600">|</span>
+                        <span className="text-slate-400">수량</span>
+                        <span className="mx-2 text-slate-600">|</span>
+                        <span>{order.quantity}개</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+
+            {/* 제공 완료 주문 리스트 */}
+            <section>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-black text-slate-300 flex items-center gap-2">
+                  <PackageCheck size={22} className="text-slate-500" /> 제공 완료
+                  주문
+                </h2>
+              </div>
+
+              {selectedCompletedOrders.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-slate-700 bg-slate-900/40 p-8 text-center text-slate-500 font-bold">
+                  제공 완료 처리된 주문 내역이 없습니다.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {selectedCompletedOrders.map((order, index) => (
+                    <div
+                      key={order.id}
+                      className="flex flex-col md:flex-row md:items-center justify-between gap-4 rounded-2xl border border-slate-700 bg-slate-900/60 p-5 opacity-70"
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 rounded-2xl bg-slate-700 text-slate-400 flex items-center justify-center font-black">
+                          {index === 0 ? "TOP" : index + 1}
+                        </div>
+                        <div>
+                          <p className="text-2xl font-black text-slate-300 line-through decoration-slate-600">
+                            {order.tableId}번 테이블
+                          </p>
+                          <p className="text-sm text-slate-500 font-bold">
+                            주문번호 {order.orderId}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm font-bold">
+                        <div className="rounded-xl bg-black/20 px-4 py-3">
+                          <p className="text-slate-600 text-xs mb-1">주문시간</p>
+                          <p className="text-slate-400">
+                            {formatClock(order.orderedAt, order.time)}
+                          </p>
+                        </div>
+                        <div className="rounded-xl bg-black/20 px-4 py-3">
+                          <p className="text-slate-600 text-xs mb-1">수량</p>
+                          <p className="text-slate-400">{order.quantity}개</p>
+                        </div>
+                        <div className="rounded-xl bg-black/20 px-4 py-3">
+                          <p className="text-slate-600 text-xs mb-1">완료자</p>
+                          <p className="text-slate-400">
+                            {order.completedBy || "-"}
+                          </p>
+                        </div>
+                        <div className="rounded-xl bg-black/20 px-4 py-3">
+                          <p className="text-slate-600 text-xs mb-1">완료시간</p>
+                          <p className="text-slate-400">
+                            {formatClock(order.completedAt)}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+}
