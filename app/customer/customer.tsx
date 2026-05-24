@@ -443,7 +443,7 @@ export default function OrderPage() {
               <div className="bg-white text-orange-500 w-8 h-8 rounded-full flex items-center justify-center font-bold">{totalQuantity}</div>
               <div className="flex flex-col items-start">
                 <span className="font-semibold text-lg leading-tight">{totalPrice.toLocaleString()}원</span>
-                <span className="text-xs font-medium text-orange-100 opacity-90">예상 획득: 🪙 {totalTokens}개</span>
+                <span className="text-xs font-medium text-orange-100 opacity-90">토큰 획득: 🪙 {totalTokens}개</span>
               </div>
             </div>
             <div className="flex items-center font-bold text-lg">장바구니 보기 <ChevronRight size={20} className="ml-1" /></div>
