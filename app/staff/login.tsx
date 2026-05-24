@@ -31,13 +31,15 @@ export default function StaffLoginPage() {
   }, [router]);
 
   useEffect(() => {
-    setIsNameValid(/^[가-힣]{3}$/.test(name));
+    // 💡 변경점 1: 한글 3자 제한 제거. 빈 값이 아니면 유효한 것으로 처리 (추후 JWT 로그인에 유연하게 대응)
+    setIsNameValid(name.trim().length > 0);
     setIsPwValid(/^\d{6}$/.test(password));
   }, [name, password]);
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     if (isNameValid && isPwValid) {
+      // TODO: 추후 이곳에 JWT 로그인(API 호출) 로직을 추가하세요.
       try {
         if (rememberMe) {
           localStorage.setItem("rememberedStaffName", name);
@@ -58,23 +60,25 @@ export default function StaffLoginPage() {
   }
 
   return (
-    // 1. 전체 영역을 flex flex-col 구조로 변경하여 상단바와 본문을 정렬합니다.
     <div className="flex flex-col min-h-[100dvh] bg-[#0f172a] text-white">
       
-      {/* 2. 로그인 페이지 전용 심플 네비게이션 바 (로고만 포함) */}
       <nav className="h-16 border-b border-slate-800 bg-[#1e293b] flex items-center px-4 md:px-6 sticky top-0 z-[100] w-full">
         <span className="text-xl font-black text-orange-500 tracking-tighter cursor-default">
           CAISINO
         </span>
       </nav>
 
-      {/* 3. 기존 로그인 폼 (flex-1을 주어 상단 바를 제외한 나머지 화면 중앙에 정렬) */}
       <div className="flex-1 flex items-center justify-center p-4 sm:p-6 md:p-8">
         <div className="w-full max-w-[320px] sm:max-w-sm md:max-w-md bg-[#1e293b] rounded-2xl sm:rounded-3xl p-6 sm:p-8 md:p-10 shadow-2xl border border-slate-700">
           
           <div className="text-center mb-8 sm:mb-10">
             <div className="inline-block p-3 sm:p-4 bg-orange-500/10 rounded-xl sm:rounded-2xl mb-3 sm:mb-4">
-              <span className="text-3xl sm:text-4xl">👨‍🍳</span>
+              {/* 💡 변경점 2: 이모지 아이콘을 favicon.ico 이미지로 교체 */}
+              <img 
+                src="/favicon.ico" 
+                alt="CAI Logo" 
+                className="w-10 h-10 sm:w-12 sm:h-12 mx-auto" 
+              />
             </div>
             <h2 className="text-xs sm:text-sm font-semibold text-orange-500 tracking-widest uppercase mb-1">CAISINO</h2>
             <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-100">STAFF LOGIN</h1>
@@ -82,10 +86,11 @@ export default function StaffLoginPage() {
 
           <form onSubmit={handleLogin} className="space-y-4 sm:space-y-5">
             <div>
+              {/* 💡 변경점 3: 라벨과 placeholder를 ID/이름 입력에 맞게 수정 */}
               <label className="block text-xs sm:text-sm font-medium text-slate-400 mb-1 sm:mb-2 ml-1">이름</label>
               <input
                 type="text"
-                placeholder="한글 3자"
+                placeholder="이름을 입력하세요"
                 value={name}
                 onChange={(e) => setName(e.target.value.replace(/\s+/g, ''))}
                 className={`w-full bg-[#0f172a] border ${name && !isNameValid ? 'border-red-500/50' : 'border-slate-600'} rounded-lg sm:rounded-xl py-3 px-4 sm:py-4 sm:px-5 text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-orange-500 transition-all`}
@@ -123,7 +128,8 @@ export default function StaffLoginPage() {
                   onChange={(e) => setRememberMe(e.target.checked)}
                   className="w-3.5 h-3.5 sm:w-4 sm:h-4 rounded border-slate-600 bg-slate-800 text-orange-500 focus:ring-orange-500 accent-orange-500"
                 />
-                <span className="text-xs sm:text-sm text-slate-400 group-hover:text-slate-200 transition-colors">이름 기억하기</span>
+                {/* 💡 변경점 4: '이름 기억하기' -> '아이디 기억하기'로 자연스럽게 텍스트 수정 */}
+                <span className="text-xs sm:text-sm text-slate-400 group-hover:text-slate-200 transition-colors">아이디 기억하기</span>
               </label>
             </div>
 
