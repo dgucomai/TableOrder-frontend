@@ -41,7 +41,6 @@ export function SseProvider({ children }: { children: ReactNode }) {
         "ITEM_STATUS_CHANGED",
         "CALL_RESOLVED",
         "TABLE_STATUS_CHANGED",
-        "TABLE_AMOUNT_CHANGED",
         "TOKEN_UPDATED",
       ];
 

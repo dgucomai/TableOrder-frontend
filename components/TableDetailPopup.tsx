@@ -34,7 +34,6 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
   const [isResetOpen, setIsResetOpen] = useState(false);
   const [tokenDelta, setTokenDelta] = useState<string>(""); 
 
-  const [totalAmount, setTotalAmount] = useState(0);
   const [startedAt, setStartedAt] = useState<string | null>(null);
 
   const [isDeleteOrderOpen, setIsDeleteOrderOpen] = useState(false);
@@ -88,8 +87,7 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
       if (result.success && result.data) {
         const tableData = result.data;
         setTableNumber(tableData.tableNumber); 
-        setTokens(tableData.tokenCount || 0); 
-        setTotalAmount(tableData.totalAmount ?? tableData.tokenAmount ?? 0); 
+        setTokens(tableData.tokenCount || 0);
         setStartedAt(tableData.startedAt || null);
 
         const mappedCalls: CallInfo[] = [];
@@ -197,12 +195,16 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
   useSseEvent("TABLE_STATUS_CHANGED", ({ tableId: id }: any) => {
     if (id === tableId) fetchTableDetail();
   });
-  useSseEvent("TABLE_AMOUNT_CHANGED", ({ tableId: id, totalAmount: amount }: any) => {
-    if (id === tableId) setTotalAmount(amount);
-  });
   useSseEvent("TOKEN_UPDATED", ({ tableId: id, tokenCount }: any) => {
     if (id === tableId) setTokens(tokenCount);
   });
+
+  const totalAmount = useMemo(() =>
+    orders
+      .filter((o) => o.orderStatus !== "입금 확인 대기")
+      .reduce((sum, o) => sum + o.price * o.quantity, 0),
+    [orders]
+  );
 
   const usageTime = useMemo(() => {
     if (!startedAt) return "0분";
