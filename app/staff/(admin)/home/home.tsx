@@ -90,9 +90,7 @@ export default function AdminHomePage() {
   useSseEvent("DEALER_CALL_CREATED", ({ tableId }: any) =>
     setTables((prev) => prev.map((t) => t.id === tableId ? { ...t, status: "dealer" } : t))
   );
-  useSseEvent("TABLE_STATUS_CHANGED", ({ tableId, status }: any) =>
-    setTables((prev) => prev.map((t) => t.id === tableId ? { ...t, status: mapBackendStatusToFrontend(status) } : t))
-  );
+  useSseEvent("TABLE_STATUS_CHANGED", fetchInitialTables);
 
   // --- 기존의 데스크탑 전용 휠/터치 마우스 이벤트 핸들러 ---
   useEffect(() => {
