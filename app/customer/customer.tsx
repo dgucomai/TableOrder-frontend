@@ -607,6 +607,7 @@ export default function OrderPage() {
               </button>
             </div>
           </div>
+        </div>
       )}
 
       {/* 2. PAYMENT 단계 */}
