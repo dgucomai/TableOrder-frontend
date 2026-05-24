@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { staffFetch } from "@/lib/staffFetch";
 import { useSseEvent } from "@/lib/SseContext";
 import { X, Coins, Clock, Check, AlertTriangle, Timer, CreditCard, RotateCcw, Trash2, MessageSquare } from "lucide-react";
@@ -70,7 +70,7 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
     }
   };
 
-  const fetchTableDetail = async () => {
+  const fetchTableDetail = useCallback(async () => {
     try {
       const response = await staffFetch(`/api/staff/tables/${tableId}`, {
         method: "GET",
@@ -147,7 +147,7 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
     } catch (error) {
       console.error("테이블 상세 정보 조회 실패:", error);
     }
-  };
+  }, [tableId]);
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 60000);
