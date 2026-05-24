@@ -204,7 +204,7 @@ export default function OrderPage() {
         setCart([]);
       } else {
         // 💡 실패 시 처리: 400 에러 및 MENU_SOLD_OUT 분기 처리
-        if (response.status === 400 && result.code === 'MENU_SOLD_OUT') {
+        if (!response.ok && result.message === '400 MENU_SOLD_OUT') {
           alert("죄송합니다. 담으신 메뉴 중 방금 품절된 상품이 있습니다.\n장바구니를 다시 확인해 주세요.");
           
           // UX 개선: 사용자가 바로 장바구니를 수정할 수 있도록 메뉴판/장바구니 화면으로 돌려보냄
