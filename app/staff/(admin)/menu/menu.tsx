@@ -2,13 +2,11 @@
 
 import React, { useEffect, useState } from "react";
 import { staffFetch } from "@/lib/staffFetch";
-import { MenuItem, StaffOrderItem } from "./types";
-import { getOrdersFromStorage } from "./utils";
+import { MenuItem } from "./types";
 import MenuListView from "./MenuListView";
 import MenuDetailView from "./MenuDetailView";
 
 export default function StaffMenuPage() {
-  const [orders, setOrders] = useState<StaffOrderItem[]>([]);
   const [menus, setMenus] = useState<MenuItem[]>([]);
   const [categories, setCategories] = useState<string[]>(["All"]);
   const [selectedMenu, setSelectedMenu] = useState<MenuItem | null>(null);
@@ -16,20 +14,31 @@ export default function StaffMenuPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isTogglingSoldOut, setIsTogglingSoldOut] = useState(false);
 
-  // 메뉴 데이터 API 호출
+  // 메뉴 리스트 API 호출
   useEffect(() => {
     const fetchMenus = async () => {
       try {
         setIsLoading(true);
-        const response = await fetch("/api/menus");
+        const response = await staffFetch("/api/staff/menus");
         const result = await response.json();
 
-        if (result.success && result.data?.menus) {
-          const fetchedMenus = result.data.menus;
+        if (result.success && result.data) {
+          // API 응답 객체를 UI 요구사항에 맞게 매핑
+          const fetchedMenus: MenuItem[] = result.data.map((item: any) => ({
+            ...item,
+            menuId: item.menuItemId,
+            menuName: item.name,
+            // API 응답에 누락될 경우를 대비한 기본값 처리
+            categoryName: item.categoryName || "기본",
+            price: item.price || 0,
+            imageUrl: item.imageUrl || null,
+            isSoldOut: item.isSoldOut || false,
+          }));
+          
           setMenus(fetchedMenus);
 
           const uniqueCategories = Array.from(
-            new Set(fetchedMenus.map((m: MenuItem) => m.categoryName))
+            new Set(fetchedMenus.map((m: MenuItem) => m.categoryName).filter(Boolean))
           ) as string[];
           setCategories(["All", ...uniqueCategories]);
         }
@@ -58,29 +67,6 @@ export default function StaffMenuPage() {
     return () => window.removeEventListener("popstate", handlePopState);
   }, [menus]);
 
-  // 주문 데이터 갱신 및 로컬스토리지 동기화
-  const refreshOrders = () => {
-    setOrders(getOrdersFromStorage());
-  };
-
-  useEffect(() => {
-    refreshOrders();
-
-    const handleStorage = (event: StorageEvent) => {
-      if (event.key === "staffOrders") refreshOrders();
-    };
-    const handleFocus = () => refreshOrders();
-
-    window.addEventListener("storage", handleStorage);
-    window.addEventListener("focus", handleFocus);
-
-    return () => {
-      window.removeEventListener("storage", handleStorage);
-      window.removeEventListener("focus", handleFocus);
-    };
-  }, []);
-
-  // 상세 메뉴 클릭 처리 (히스토리 스택 추가)
   const handleMenuClick = (menu: MenuItem) => {
     setSelectedMenu(menu);
     window.history.pushState(
@@ -90,7 +76,6 @@ export default function StaffMenuPage() {
     );
   };
 
-  // 상세 메뉴 내 뒤로가기 버튼 클릭 처리
   const handleBackClick = () => {
     if (window.history.state?.menuId) {
       window.history.back();
@@ -99,7 +84,6 @@ export default function StaffMenuPage() {
     }
   };
 
-  // 품절 상태 변경 API 호출 로직
   const toggleSoldOutStatus = async () => {
     if (!selectedMenu) return;
 
@@ -117,13 +101,9 @@ export default function StaffMenuPage() {
 
       const result = await response.json();
 
-      if (result.success && result.data) {
-        const updatedMenu = result.data;
-        
-        // 현재 열려있는 상세 메뉴 상태 업데이트
+      if (result.success) {
+        const updatedMenu = { ...selectedMenu, isSoldOut: newSoldOutStatus };
         setSelectedMenu(updatedMenu);
-        
-        // 전체 메뉴 목록의 해당 메뉴 상태도 업데이트
         setMenus((prevMenus) =>
           prevMenus.map((m) =>
             m.menuId === updatedMenu.menuId ? updatedMenu : m
@@ -140,12 +120,10 @@ export default function StaffMenuPage() {
     }
   };
 
-  // 조건부 렌더링: 선택된 메뉴가 있으면 상세 뷰, 없으면 목록 뷰 렌더링
   if (selectedMenu) {
     return (
       <MenuDetailView
         menu={selectedMenu}
-        orders={orders}
         isTogglingSoldOut={isTogglingSoldOut}
         onBackClick={handleBackClick}
         onToggleSoldOut={toggleSoldOutStatus}
@@ -159,7 +137,6 @@ export default function StaffMenuPage() {
       categories={categories}
       activeCategory={activeCategory}
       isLoading={isLoading}
-      orders={orders}
       onCategoryChange={setActiveCategory}
       onMenuClick={handleMenuClick}
     />
