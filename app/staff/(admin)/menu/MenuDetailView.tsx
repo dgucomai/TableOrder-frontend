@@ -23,6 +23,7 @@ interface PreparingOrderData {
   unitPrice: number;
   subtotal: number;
   itemStatus: string;
+  createdAt: string; // 시간 표시를 위해 필드 추가
 }
 
 export default function MenuDetailView({
@@ -87,6 +88,18 @@ export default function MenuDetailView({
     } catch (e) {
       alert("서버 통신 오류가 발생했습니다.");
     }
+  };
+
+  // 시간 포맷팅 함수 (오전/오후 시:분:초)
+  const formatOrderTime = (createdAt?: string) => {
+    if (!createdAt) return "";
+    const date = new Date(createdAt);
+    return date.toLocaleTimeString("ko-KR", {
+      hour: "numeric",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: true,
+    });
   };
 
   return (
@@ -188,33 +201,57 @@ export default function MenuDetailView({
                   {preparingOrders.map((order) => (
                     <div
                       key={order.orderItemId}
-                      className="flex flex-col gap-1.5 rounded-2xl border border-orange-500/20 bg-orange-500/10 py-3 px-4 md:px-5"
+                      className="flex flex-col gap-2 rounded-2xl border border-orange-500/20 bg-orange-500/10 py-4 px-4 md:px-5"
                     >
-                      {/* 좌측 상단 주문번호 */}
-                      <div className="text-xs text-orange-200/60 font-bold">
-                        #{order.orderId}
+                      {/* 좌측 상단 주문번호 및 시간 표시 */}
+                      <div className="flex items-center gap-2">
+                        <div className="text-xs text-orange-200/60 font-bold">
+                          #{order.orderId}
+                        </div>
+                        {order.createdAt && (
+                          <div className="text-xs text-orange-200/60 font-medium tracking-wide">
+                            ({formatOrderTime(order.createdAt)})
+                          </div>
+                        )}
                       </div>
 
                       {/* 하단 내용 (테이블, 수량, 버튼) 가로 정렬 */}
-                      <div className="flex items-center justify-between gap-4">
-                        <div className="text-xl md:text-2xl font-black text-white whitespace-nowrap">
-                          {order.tableNumber !== undefined ? `${order.tableNumber}번` : `${order.tableId}번`}
+                      <div className="flex items-center justify-between gap-4 mt-1">
+                        
+                        {/* 테이블 번호 영역: 박스 형태로 감싸서 돋보이게 처리 */}
+                        <div className="flex items-center gap-2 md:gap-3">
+                          <div className="flex items-center justify-center min-w-[4rem] px-3 py-1.5 rounded-xl bg-slate-800/80 border border-slate-700/50 shadow-sm">
+                            <span className="text-xl md:text-2xl font-black text-white whitespace-nowrap">
+                              {order.tableNumber !== undefined ? `${order.tableNumber}번` : `${order.tableId}번`}
+                            </span>
+                          </div>
+                          <span className="hidden md:inline-block text-sm font-bold text-slate-400">
+                            테이블
+                          </span>
                         </div>
 
-                        <div className="flex items-center gap-4 md:gap-8">
-                          {/* 수량 (1이 아닐 때 빨간색으로 강조) */}
+                        <div className="flex items-center gap-3 md:gap-6">
+                          {/* 수량 영역: 1개일 땐 기본 스타일, 2개 이상일 땐 붉은색 강조 스타일 박스 적용 */}
                           <div
-                            className={`text-lg md:text-xl font-black whitespace-nowrap ${
-                              order.quantity !== 1 ? "text-red-500" : "text-white"
+                            className={`flex items-center justify-center px-4 py-1.5 rounded-xl border shadow-sm ${
+                              order.quantity !== 1
+                                ? "bg-red-500/10 border-red-500/30"
+                                : "bg-slate-800/80 border-slate-700/50"
                             }`}
                           >
-                            {order.quantity}개
+                            <span
+                              className={`text-lg md:text-xl font-black whitespace-nowrap ${
+                                order.quantity !== 1 ? "text-red-400" : "text-white"
+                              }`}
+                            >
+                              {order.quantity}개
+                            </span>
                           </div>
 
                           {/* 상태 변경 버튼 */}
                           <button
                             onClick={() => updateItemStatus(order.orderItemId, order.itemStatus)}
-                            className={`px-4 py-2 sm:px-6 rounded-xl font-black text-xs sm:text-sm transition-all whitespace-nowrap ${
+                            className={`px-5 py-2.5 sm:px-6 rounded-xl font-black text-sm transition-all whitespace-nowrap ${
                               order.itemStatus === "SERVED"
                                 ? "bg-slate-700 text-slate-400 hover:bg-slate-600 active:scale-95 shadow-inner"
                                 : "bg-orange-500 text-white hover:bg-orange-400 active:scale-95 shadow-lg shadow-orange-900/20"
