@@ -15,8 +15,8 @@ interface Order {
   price: number;
   time: string;       // 화면 표시용 (HH:MM)
   createdAt: string;  // 정렬용 원본 시간 데이터
-  orderStatus: "입금 확인 대기" | "준비 중" | "제공 완료" | "거절됨"; // 전체 주문 상태
-  itemStatus: "입금 확인 대기" | "준비 중" | "제공 완료" | "거절됨"; // 개별 메뉴 상태
+  orderStatus: "입금 확인 대기" | "준비 중" | "제공 완료" | "거절됨" | "취소됨"; // 전체 주문 상태
+  itemStatus: "입금 확인 대기" | "준비 중" | "제공 완료" | "거절됨" | "취소됨"; // 개별 메뉴 상태
   isTokenPayment?: boolean;
 }
 
@@ -42,6 +42,11 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
   const [orderIdToDelete, setOrderIdToDelete] = useState<number | null>(null);
   const [deleteReason, setDeleteReason] = useState("");
 
+  // 취소 관련 상태 추가
+  const [isCancelOrderOpen, setIsCancelOrderOpen] = useState(false);
+  const [orderIdToCancel, setOrderIdToCancel] = useState<number | null>(null);
+  const [cancelReason, setCancelReason] = useState("");
+
   const [activeCalls, setActiveCalls] = useState<CallInfo[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -59,6 +64,7 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
       case "COOKING": return "준비 중";
       case "COMPLETED": return "제공 완료";
       case "REJECTED": return "거절됨";
+      case "CANCELLED": return "취소됨";
       default: return "준비 중";
     }
   };
@@ -66,11 +72,13 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
   // 하위 메뉴(Item)의 상태를 매핑하는 헬퍼 함수
   const mapItemStatus = (itemStatus: string | null, orderStatus: string) => {
     if (orderStatus === "REJECTED") return "거절됨";
+    if (orderStatus === "CANCELLED") return "취소됨";
     if (orderStatus === "PAYMENT_PENDING" && !itemStatus) return "입금 확인 대기";
     switch (itemStatus) {
       case "SERVED": return "제공 완료";
       case "PREPARING": return "준비 중";
       case "REJECTED": return "거절됨";
+      case "CANCELLED": return "취소됨";
       default: return orderStatus === "PAYMENT_PENDING" ? "입금 확인 대기" : "준비 중";
     }
   };
@@ -163,7 +171,7 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
 
   const triggerRefresh = ({ tableId: id }: any) => { if (id === tableId) setRefreshKey((k) => k + 1); };
 
-  // SSE 이벤트 구독 — 현재 팝업의 tableId에 해당하는 이벤트만 처리
+  // SSE 이벤트 구독
   useSseEvent("PAYMENT_REQUEST_CREATED", triggerRefresh);
   useSseEvent("STAFF_CALL_CREATED",      triggerRefresh);
   useSseEvent("ORDER_APPROVED",          triggerRefresh);
@@ -174,18 +182,23 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
     if (id !== tableId) return;
     setOrders((prev) => prev.map((o) => o.orderId === orderId ? { ...o, orderStatus: "거절됨", itemStatus: "거절됨" } : o));
   });
+  useSseEvent("ORDER_CANCELLED", ({ tableId: id, orderId }: any) => {
+    if (id !== tableId) return;
+    setOrders((prev) => prev.map((o) => o.orderId === orderId ? { ...o, orderStatus: "취소됨", itemStatus: "취소됨" } : o));
+  });
   useSseEvent("ORDER_STATUS_CHANGED", ({ tableId: id, orderId, status }: any) => {
     if (id !== tableId) return;
     const mapped = mapOrderStatus(status) as Order["orderStatus"];
     setOrders((prev) => prev.map((o) => 
       o.orderId === orderId 
-        ? { ...o, orderStatus: mapped, ...(mapped === '거절됨' ? { itemStatus: '거절됨' } : {}) } 
+        ? { ...o, orderStatus: mapped, ...((mapped === '거절됨' || mapped === '취소됨') ? { itemStatus: mapped } : {}) } 
         : o
     ));
   });
   useSseEvent("ITEM_STATUS_CHANGED", ({ orderId, itemId, status }: any) => {
     let itemStatus = status === "SERVED" ? "제공 완료" : "준비 중";
     if (status === "REJECTED") itemStatus = "거절됨";
+    if (status === "CANCELLED") itemStatus = "취소됨";
     
     setOrders((prev) => {
       const hasItem = prev.some((o) => o.orderId === orderId && o.orderItemId === itemId);
@@ -198,7 +211,7 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
 
   const totalAmount = useMemo(() =>
     orders
-      .filter((o) => o.orderStatus !== "입금 확인 대기" && o.orderStatus !== "거절됨")
+      .filter((o) => o.orderStatus !== "입금 확인 대기" && o.orderStatus !== "거절됨" && o.orderStatus !== "취소됨")
       .reduce((sum, o) => sum + o.price * o.quantity, 0),
     [orders]
   );
@@ -280,7 +293,7 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
 
   // [API 연동] 개별 메뉴 상태 변경 (준비 중 <-> 제공 완료)
   const updateItemStatus = async (orderItemId: number, currentItemStatus: string) => {
-    if (currentItemStatus === "입금 확인 대기" || currentItemStatus === "거절됨") return;
+    if (currentItemStatus === "입금 확인 대기" || currentItemStatus === "거절됨" || currentItemStatus === "취소됨") return;
 
     // 현재 상태에 따라 다음 상태 결정 (토글 방식)
     const nextStatus = currentItemStatus === "준비 중" ? "SERVED" : "PREPARING";
@@ -310,16 +323,26 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
   const handleDeleteGroupClick = (orderId: number) => { 
     setIsEditTokenOpen(false); 
     setIsResetOpen(false); 
+    setIsCancelOrderOpen(false);
     setOrderIdToDelete(orderId); 
     setDeleteReason(""); 
     setIsDeleteOrderOpen(true); 
+  };
+
+  const handleCancelGroupClick = (orderId: number) => {
+    setIsEditTokenOpen(false);
+    setIsResetOpen(false);
+    setIsDeleteOrderOpen(false);
+    setOrderIdToCancel(orderId);
+    setCancelReason("");
+    setIsCancelOrderOpen(true);
   };
 
   const executeDeleteGroup = async () => {
     if (orderIdToDelete === null) return; 
     
     try {
-      const response = await staffFetch(`/api/staff/orders/${orderIdToDelete}`, {
+      const response = await staffFetch(`/api/staff/orders/${orderIdToDelete}/reject`, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ reason: deleteReason }),
@@ -337,6 +360,37 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
       setIsDeleteOrderOpen(false); 
       setOrderIdToDelete(null); 
       setDeleteReason(""); 
+      
+      alert("해당 주문이 성공적으로 거절되었습니다.");
+
+    } catch (e) {
+      console.error(e);
+      alert("주문 거절 실패: 서버와 통신 중 문제가 발생했습니다.");
+    }
+  };
+
+  const executeCancelGroup = async () => {
+    if (orderIdToCancel === null) return; 
+    
+    try {
+      const response = await staffFetch(`/api/staff/orders/${orderIdToCancel}/cancel`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason: cancelReason }),
+      });
+
+      if (!response.ok) throw new Error("서버 응답 오류");
+      
+      // 취소된 주문을 로컬에서 "취소됨" 상태로 전환 처리
+      setOrders(prev => prev.map(order => 
+        order.orderId === orderIdToCancel 
+          ? { ...order, orderStatus: "취소됨", itemStatus: "취소됨" } 
+          : order
+      ));
+      
+      setIsCancelOrderOpen(false); 
+      setOrderIdToCancel(null); 
+      setCancelReason(""); 
       
       alert("해당 주문이 성공적으로 취소되었습니다.");
 
@@ -428,7 +482,7 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-md p-0 sm:p-4" onClick={onClose}>
-      <div className={`flex flex-col md:flex-row transition-all duration-500 w-full h-full sm:h-[90vh] max-w-[1400px] ${(isEditTokenOpen || isResetOpen || isDeleteOrderOpen) ? "md:-translate-x-[5vw]" : ""}`} onClick={(e) => e.stopPropagation()}>
+      <div className={`flex flex-col md:flex-row transition-all duration-500 w-full h-full sm:h-[90vh] max-w-[1400px] ${(isEditTokenOpen || isResetOpen || isDeleteOrderOpen || isCancelOrderOpen) ? "md:-translate-x-[5vw]" : ""}`} onClick={(e) => e.stopPropagation()}>
         
         <motion.div className="relative flex-1 bg-[#1e293b] sm:rounded-[2rem] shadow-2xl border border-white/10 flex flex-col overflow-hidden z-10">
           <div className="px-6 py-4 sm:px-10 sm:py-6 border-b border-white/5 flex justify-between items-center bg-slate-800/40">
@@ -489,31 +543,50 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
               {sortedGroupKeys.map((orderId) => {
                 const groupOrders = groupedOrders[orderId];
                 const orderTime = groupOrders[0].time;
+                const orderStatus = groupOrders[0].orderStatus;
+                
                 const isWaitingDeposit = groupOrders.some((o: Order) => o.orderStatus === "입금 확인 대기");
                 const isRejected = groupOrders.some((o: Order) => o.orderStatus === "거절됨");
+                const isCancelled = groupOrders.some((o: Order) => o.orderStatus === "취소됨");
+                
+                // 취소 가능한 상태: 입금 확인 대기, 준비 중, 제공 완료
+                const canCancel = ["입금 확인 대기", "준비 중", "제공 완료"].includes(orderStatus);
                 
                 return (
                   <div key={orderId} className="bg-[#0f172a]/40 rounded-2xl p-4 border border-white/5 relative">
                     <div className="flex justify-between items-center mb-4 border-b border-white/5 pb-3">
-                      {/* 왼쪽 영역: 주문시간 및 주문번호 */}
+                      {/* 왼쪽 영역: 주문 취소(X) 버튼, 주문시간 및 주문번호 */}
                       <div className="text-[13px] text-slate-500 font-mono flex items-center gap-2">
+                        {canCancel && (
+                          <button 
+                            onClick={() => handleCancelGroupClick(orderId)}
+                            className="p-1 hover:bg-red-500/20 text-slate-500 hover:text-red-500 rounded transition-colors mr-1"
+                            title="주문 취소"
+                          >
+                            <X size={16} strokeWidth={3} />
+                          </button>
+                        )}
                         <span>주문시간: {orderTime}</span>
                         <span className="text-[10px] text-slate-600">#{orderId}</span>
                       </div>
                       
-                      {/* 오른쪽 영역: 거절 뱃지 & 입금 확인 버튼들 */}
+                      {/* 오른쪽 영역: 뱃지 & 입금 확인 버튼들 */}
                       <div className="flex items-center gap-2">
-                        {/* 승인 거절 뱃지를 이곳으로 이동 */}
                         {isRejected && (
                           <span className="bg-red-500/10 text-red-500 border border-red-500/20 px-2 py-0.5 rounded-md text-[10px] font-bold">
                             승인 거절
+                          </span>
+                        )}
+                        {isCancelled && (
+                          <span className="bg-red-500/10 text-red-500 border border-red-500/20 px-2 py-0.5 rounded-md text-[10px] font-bold">
+                            취소됨
                           </span>
                         )}
                         
                         {isWaitingDeposit && (
                           <>
                             <button onClick={() => handleDeleteGroupClick(orderId)} className="bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/20 px-4 py-2 rounded-lg font-black text-xs flex items-center gap-2 transition-all active:scale-95">
-                              <Trash2 size={14} /> 주문 취소
+                              <Trash2 size={14} /> 주문 거절
                             </button>
                             <button onClick={() => confirmGroupDeposit(orderId)} className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg font-black text-xs flex items-center gap-2 transition-all shadow-lg shadow-emerald-900/20 active:scale-95">
                               <CreditCard size={14} /> 입금 확인
@@ -541,6 +614,12 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
                               disabled 
                               className="px-4 py-2 sm:px-6 sm:py-3 rounded-xl font-black text-xs sm:text-sm bg-red-900/50 text-red-500 border border-red-500/20 cursor-not-allowed">
                               거절됨
+                            </button>
+                          ) : order.itemStatus === "취소됨" ? (
+                            <button 
+                              disabled 
+                              className="px-4 py-2 sm:px-6 sm:py-3 rounded-xl font-black text-xs sm:text-sm bg-red-900/50 text-red-500 border border-red-500/20 cursor-not-allowed">
+                              취소됨
                             </button>
                           ) : (
                             <button 
@@ -579,7 +658,7 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
           <div className="p-4 sm:p-8 bg-slate-900/40 border-t border-white/5 flex flex-row gap-2 sm:gap-3">
             <button 
               disabled={isEmptyTable}
-              onClick={() => { setIsResetOpen(false); setIsDeleteOrderOpen(false); setIsEditTokenOpen(!isEditTokenOpen); setTokenDelta(""); }} 
+              onClick={() => { setIsResetOpen(false); setIsDeleteOrderOpen(false); setIsCancelOrderOpen(false); setIsEditTokenOpen(!isEditTokenOpen); setTokenDelta(""); }} 
               className={`flex-1 py-3 sm:py-6 rounded-2xl font-black text-[15px] sm:text-xl flex items-center justify-center gap-1.5 sm:gap-3 transition-all ${
                 isEmptyTable 
                   ? "bg-slate-800 text-slate-600 cursor-not-allowed opacity-50" 
@@ -592,7 +671,7 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
             
             <button 
               disabled={isEmptyTable}
-              onClick={() => { setIsEditTokenOpen(false); setIsDeleteOrderOpen(false); setIsResetOpen(!isResetOpen); }} 
+              onClick={() => { setIsEditTokenOpen(false); setIsDeleteOrderOpen(false); setIsCancelOrderOpen(false); setIsResetOpen(!isResetOpen); }} 
               className={`flex-1 py-3 sm:py-6 rounded-2xl font-black text-[15px] sm:text-xl flex items-center justify-center gap-1.5 sm:gap-3 transition-all ${
                 isEmptyTable 
                   ? "bg-slate-800 text-slate-600 cursor-not-allowed opacity-50" 
@@ -670,36 +749,68 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
             </motion.div>
           )}
 
-          {/* 주문 전체 취소 팝업 */}
+          {/* 주문 전체 거절 팝업 */}
           {isDeleteOrderOpen && (
             <motion.div key="order-delete" initial={{ x: "100%", opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: "100%", opacity: 0 }}
               className="fixed inset-0 md:relative md:inset-auto z-20 md:z-0 bg-slate-900/95 md:bg-slate-800 border-l border-white/10 md:rounded-r-[2rem] w-full md:w-[350px] flex flex-col justify-center shadow-2xl">
               <button onClick={() => setIsDeleteOrderOpen(false)} className="md:hidden absolute top-6 right-6 p-4 bg-white/10 rounded-full"><X size={32} /></button>
               <div className="p-10 space-y-8">
-                <h3 className="text-2xl font-black text-red-500 italic flex items-center gap-2 uppercase tracking-tighter"><Trash2 size={28} /> 주문 전체 취소</h3>
+                <h3 className="text-2xl font-black text-red-500 italic flex items-center gap-2 uppercase tracking-tighter"><Trash2 size={28} /> 주문 거절</h3>
                 
                 {orderIdToDelete !== null && (
                   <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl">
                     <p className="text-red-400 font-bold text-sm">주문 번호 : #{orderIdToDelete}</p>
-                    <p className="text-red-500/60 text-xs mt-1">해당 주문 전체를 정말 삭제/취소하시겠습니까?</p>
+                    <p className="text-red-500/60 text-xs mt-1">해당 주문 전체를 정말 거절 하시겠습니까?</p>
                   </div>
                 )}
 
                 <div className="space-y-6">
                   <div>
-                    <label className="text-[12px] text-slate-500 font-bold block mb-2 uppercase tracking-widest">취소 사유</label>
+                    <label className="text-[12px] text-slate-500 font-bold block mb-2 uppercase tracking-widest">거절 사유</label>
                     <input type="text" placeholder="사유 입력 (필수)" value={deleteReason} onChange={(e) => setDeleteReason(e.target.value)} className="w-full bg-[#0f172a] border border-white/10 rounded-xl p-4 text-sm font-bold outline-none focus:ring-1 focus:ring-red-500 text-slate-200" />
                   </div>
                 </div>
                 <div className="space-y-3">
                   <button disabled={!deleteReason.trim()} onClick={executeDeleteGroup}
                     className={`w-full py-5 rounded-xl font-black text-lg text-white transition-all active:scale-95 ${!deleteReason.trim() ? "bg-slate-700 cursor-not-allowed opacity-50" : "bg-red-600 hover:bg-red-500 shadow-xl shadow-red-900/20"}`}
-                  >전체 취소하기</button>
+                  >주문 거절하기</button>
                   <button onClick={() => setIsDeleteOrderOpen(false)} className="w-full bg-slate-700 text-slate-300 hover:bg-slate-600 py-4 rounded-xl font-bold transition-all">돌아가기</button>
                 </div>
               </div>
             </motion.div>
           )}
+
+          {/* 주문 취소 팝업 */}
+          {isCancelOrderOpen && (
+            <motion.div key="order-cancel" initial={{ x: "100%", opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: "100%", opacity: 0 }}
+              className="fixed inset-0 md:relative md:inset-auto z-20 md:z-0 bg-slate-900/95 md:bg-slate-800 border-l border-white/10 md:rounded-r-[2rem] w-full md:w-[350px] flex flex-col justify-center shadow-2xl">
+              <button onClick={() => setIsCancelOrderOpen(false)} className="md:hidden absolute top-6 right-6 p-4 bg-white/10 rounded-full"><X size={32} /></button>
+              <div className="p-10 space-y-8">
+                <h3 className="text-2xl font-black text-red-500 italic flex items-center gap-2 uppercase tracking-tighter"><X size={28} strokeWidth={3} /> 주문 취소</h3>
+                
+                {orderIdToCancel !== null && (
+                  <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl">
+                    <p className="text-red-400 font-bold text-sm">주문 번호 : #{orderIdToCancel}</p>
+                    <p className="text-red-500/60 text-xs mt-1">해당 주문을 정말 취소 하시겠습니까?</p>
+                  </div>
+                )}
+
+                <div className="space-y-6">
+                  <div>
+                    <label className="text-[12px] text-slate-500 font-bold block mb-2 uppercase tracking-widest">취소 사유</label>
+                    <input type="text" placeholder="사유 입력 (필수)" value={cancelReason} onChange={(e) => setCancelReason(e.target.value)} className="w-full bg-[#0f172a] border border-white/10 rounded-xl p-4 text-sm font-bold outline-none focus:ring-1 focus:ring-red-500 text-slate-200" />
+                  </div>
+                </div>
+                <div className="space-y-3">
+                  <button disabled={!cancelReason.trim()} onClick={executeCancelGroup}
+                    className={`w-full py-5 rounded-xl font-black text-lg text-white transition-all active:scale-95 ${!cancelReason.trim() ? "bg-slate-700 cursor-not-allowed opacity-50" : "bg-red-600 hover:bg-red-500 shadow-xl shadow-red-900/20"}`}
+                  >주문 취소하기</button>
+                  <button onClick={() => setIsCancelOrderOpen(false)} className="w-full bg-slate-700 text-slate-300 hover:bg-slate-600 py-4 rounded-xl font-bold transition-all">돌아가기</button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
         </AnimatePresence>
       </div>
     </motion.div>
