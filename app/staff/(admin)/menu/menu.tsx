@@ -79,6 +79,7 @@ export default function StaffMenuPage() {
             countPreparing: staffItem.countPreparing || 0,
             countServed: staffItem.countServed || 0,
             subtotal: staffItem.subtotal || 0,
+            totalItemCount: staffItem.totalItemCount || 0,
         }));
       }
 
