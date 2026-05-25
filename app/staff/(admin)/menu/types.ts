@@ -13,6 +13,7 @@ export interface MenuItem {
   countPreparing: number;
   countServed: number;
   subtotal: number;
+  totalItemCount: number;
 }
   
 export interface PreparingOrderItem {

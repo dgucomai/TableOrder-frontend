@@ -65,7 +65,7 @@ export default function MenuListView({
             <section className="flex flex-col gap-3 md:gap-4">
               {filteredMenus.map((menu) => {
                 const preparingQuantity = menu.countPreparing;
-                const menuOrderCount = menu.countServed;
+                const menuOrderCount = menu.totalItemCount;
 
                 return (
                   <button
@@ -111,7 +111,7 @@ export default function MenuListView({
                       </p>
 
                       <div className="mt-3 flex items-center gap-1.5 text-[11px] md:text-xs font-black text-slate-500">
-                        <ShoppingBag size={12} /> 제공 완료 {menuOrderCount}건
+                        <ShoppingBag size={12} /> 누적 주문 개수 {menuOrderCount}개
                       </div>
                     </div>
 

@@ -185,42 +185,44 @@ export default function MenuDetailView({
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {preparingOrders.map((order, index) => (
+                  {preparingOrders.map((order) => (
                     <div
                       key={order.orderItemId}
-                      className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 rounded-2xl border border-orange-500/20 bg-orange-500/10 p-4 md:p-5"
+                      className="flex flex-col gap-1.5 rounded-2xl border border-orange-500/20 bg-orange-500/10 py-3 px-4 md:px-5"
                     >
-                      <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 rounded-2xl bg-orange-500 text-white flex items-center justify-center font-black shrink-0">
-                          {index + 1}
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-2xl font-black text-white">
-                            {order.tableNumber !== undefined ? `${order.tableNumber}번 테이블` : `테이블 ID: ${order.tableId}`}
-                          </p>
-                          <p className="text-sm text-orange-200/70 font-bold truncate">
-                            주문번호 #{order.orderId}
-                          </p>
-                        </div>
+                      {/* 좌측 상단 주문번호 */}
+                      <div className="text-xs text-orange-200/60 font-bold">
+                        #{order.orderId}
                       </div>
 
-                      <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-end">
-                        <div className="rounded-xl bg-slate-950/30 px-4 py-3 text-sm md:text-base font-black text-white whitespace-nowrap overflow-x-auto">
-                          <span className="text-slate-400">수량</span>
-                          <span className="mx-2 text-slate-600">|</span>
-                          <span>{order.quantity}개</span>
+                      {/* 하단 내용 (테이블, 수량, 버튼) 가로 정렬 */}
+                      <div className="flex items-center justify-between gap-4">
+                        <div className="text-xl md:text-2xl font-black text-white whitespace-nowrap">
+                          {order.tableNumber !== undefined ? `${order.tableNumber}번` : `${order.tableId}번`}
                         </div>
 
-                        {/* 상태 변경 버튼 */}
-                        <button 
-                          onClick={() => updateItemStatus(order.orderItemId, order.itemStatus)} 
-                          className={`px-4 py-3 sm:px-6 rounded-xl font-black text-xs sm:text-sm transition-all whitespace-nowrap ${
-                            order.itemStatus === "SERVED" 
-                            ? "bg-slate-700 text-slate-400 hover:bg-slate-600 active:scale-95 shadow-inner" 
-                            : "bg-orange-500 text-white hover:bg-orange-400 active:scale-95 shadow-lg shadow-orange-900/20"
-                          }`}>
-                          {order.itemStatus === "PREPARING" ? "준비 중" : "제공 완료"}
-                        </button>
+                        <div className="flex items-center gap-4 md:gap-8">
+                          {/* 수량 (1이 아닐 때 빨간색으로 강조) */}
+                          <div
+                            className={`text-lg md:text-xl font-black whitespace-nowrap ${
+                              order.quantity !== 1 ? "text-red-500" : "text-white"
+                            }`}
+                          >
+                            {order.quantity}개
+                          </div>
+
+                          {/* 상태 변경 버튼 */}
+                          <button
+                            onClick={() => updateItemStatus(order.orderItemId, order.itemStatus)}
+                            className={`px-4 py-2 sm:px-6 rounded-xl font-black text-xs sm:text-sm transition-all whitespace-nowrap ${
+                              order.itemStatus === "SERVED"
+                                ? "bg-slate-700 text-slate-400 hover:bg-slate-600 active:scale-95 shadow-inner"
+                                : "bg-orange-500 text-white hover:bg-orange-400 active:scale-95 shadow-lg shadow-orange-900/20"
+                            }`}
+                          >
+                            {order.itemStatus === "PREPARING" ? "준비 중" : "제공 완료"}
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ))}
