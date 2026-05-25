@@ -495,26 +495,32 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
                 return (
                   <div key={orderId} className="bg-[#0f172a]/40 rounded-2xl p-4 border border-white/5 relative">
                     <div className="flex justify-between items-center mb-4 border-b border-white/5 pb-3">
+                      {/* 왼쪽 영역: 주문시간 및 주문번호 */}
                       <div className="text-[13px] text-slate-500 font-mono flex items-center gap-2">
                         <span>주문시간: {orderTime}</span>
                         <span className="text-[10px] text-slate-600">#{orderId}</span>
+                      </div>
+                      
+                      {/* 오른쪽 영역: 거절 뱃지 & 입금 확인 버튼들 */}
+                      <div className="flex items-center gap-2">
+                        {/* 승인 거절 뱃지를 이곳으로 이동 */}
                         {isRejected && (
                           <span className="bg-red-500/10 text-red-500 border border-red-500/20 px-2 py-0.5 rounded-md text-[10px] font-bold">
                             승인 거절
                           </span>
                         )}
+                        
+                        {isWaitingDeposit && (
+                          <>
+                            <button onClick={() => handleDeleteGroupClick(orderId)} className="bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/20 px-4 py-2 rounded-lg font-black text-xs flex items-center gap-2 transition-all active:scale-95">
+                              <Trash2 size={14} /> 주문 취소
+                            </button>
+                            <button onClick={() => confirmGroupDeposit(orderId)} className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg font-black text-xs flex items-center gap-2 transition-all shadow-lg shadow-emerald-900/20 active:scale-95">
+                              <CreditCard size={14} /> 입금 확인
+                            </button>
+                          </>
+                        )}
                       </div>
-                      
-                      {isWaitingDeposit && (
-                        <div className="flex items-center gap-2">
-                          <button onClick={() => handleDeleteGroupClick(orderId)} className="bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/20 px-4 py-2 rounded-lg font-black text-xs flex items-center gap-2 transition-all active:scale-95">
-                            <Trash2 size={14} /> 주문 취소
-                          </button>
-                          <button onClick={() => confirmGroupDeposit(orderId)} className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg font-black text-xs flex items-center gap-2 transition-all shadow-lg shadow-emerald-900/20 active:scale-95">
-                            <CreditCard size={14} /> 입금 확인
-                          </button>
-                        </div>
-                      )}
                     </div>
 
                     <div className="space-y-3">
@@ -581,7 +587,7 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
               }`}
             >
               <Coins size={20} className={isEmptyTable ? "text-slate-600" : "text-yellow-500"} /> 
-              토큰 수량 증감
+              토큰 수정
             </button>
             
             <button 
@@ -606,7 +612,7 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
               className="fixed inset-0 md:relative md:inset-auto z-20 md:z-0 bg-slate-900/95 md:bg-slate-800 border-l border-white/10 md:rounded-r-[2rem] w-full md:w-[350px] flex flex-col justify-center shadow-2xl">
               <button onClick={() => setIsEditTokenOpen(false)} className="md:hidden absolute top-6 right-6 p-4 bg-white/10 rounded-full"><X size={32} /></button>
               <div className="p-10 space-y-8">
-                <h3 className="text-2xl font-black text-yellow-500 italic flex items-center gap-2 uppercase tracking-tighter"><Coins size={28} /> 토큰 증감</h3>
+                <h3 className="text-2xl font-black text-yellow-500 italic flex items-center gap-2 uppercase tracking-tighter"><Coins size={28} /> 토큰 수량 수정</h3>
                 <div className="space-y-6">
                   <div>
                     <label className="text-[12px] text-slate-500 font-bold block mb-2 uppercase tracking-widest">현재 보유 토큰</label>
@@ -615,10 +621,10 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
                     </div>
                   </div>
                   <div>
-                    <label className="text-[12px] text-slate-500 font-bold block mb-2 uppercase tracking-widest">증감할 수량 (Delta)</label>
+                    <label className="text-[12px] text-slate-500 font-bold block mb-2 uppercase tracking-widest">증감할 수량</label>
                     <input 
                       type="number" 
-                      placeholder="예: 2, -1" 
+                      placeholder="증감할 수량을 입력하세요." 
                       value={tokenDelta} 
                       onChange={(e) => setTokenDelta(e.target.value)} 
                       className="w-full bg-[#0f172a] border border-white/10 rounded-xl p-4 text-2xl font-black text-center outline-none focus:ring-1 focus:ring-yellow-500 text-yellow-500" 
