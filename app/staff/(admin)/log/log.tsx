@@ -76,7 +76,7 @@ export default function StaffLogPage() {
     gcTime: 0, 
   });
 
-  // 1. 자동 새로고침 타이머 Effect
+  // 1. 자동 새로고침 타이머 Effect (캐시 자르기 로직 추가)
   useEffect(() => {
     if (!isAutoRefresh) {
       setCountdown(2);
@@ -86,7 +86,22 @@ export default function StaffLogPage() {
     const interval = setInterval(() => {
       setCountdown((prev) => {
         if (prev <= 1) {
+          // 누적된 무한 스크롤 데이터를 최신 1페이지로 강제 초기화
+          queryClient.setQueryData(["adminLogs"], (oldData: any) => {
+            if (!oldData || !oldData.pages) return oldData;
+            return {
+              ...oldData,
+              pages: oldData.pages.slice(0, 1),
+              pageParams: oldData.pageParams.slice(0, 1),
+            };
+          });
+
+          // 1페이지(최신 데이터)만 백그라운드에서 다시 불러옵니다.
           refetch();
+          
+          // 사용자가 아래로 스크롤을 많이 내렸을 경우를 대비해 스크롤을 맨 위로 부드럽게 올려줍니다.
+          window.scrollTo({ top: 0, behavior: "smooth" });
+
           return 2;
         }
         return prev - 1;
@@ -94,7 +109,7 @@ export default function StaffLogPage() {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [isAutoRefresh, refetch]);
+  }, [isAutoRefresh, refetch, queryClient]);
 
   // 2. 무한 스크롤 제어 Effect
   useEffect(() => {
@@ -145,9 +160,9 @@ export default function StaffLogPage() {
                 
                 {/* 자동 새로고침 토글 */}
                 <div className="flex flex-col items-center gap-1">
-                  <span className="text-[10px] font-black text-slate-400 tracking-wider">자동</span>
+                  <span className="text-[10px] font-black tracking-wider text-slate-400">자동</span>
                   
-                  <div className="flex items-center gap-1.5 h-6">
+                  <div className="flex h-6 items-center gap-1.5">
                     {isAutoRefresh && (
                       <div className="flex w-6 justify-center text-xs font-bold text-orange-500">
                         {isFetching ? (
@@ -158,7 +173,7 @@ export default function StaffLogPage() {
                       </div>
                     )}
                     
-                    <label className="flex cursor-pointer items-center" title="2초마다 자동으로 최신 기록을 불러옵니다">
+                    <label className="flex cursor-pointer items-center" title="2초마다 최신 기록(1페이지)만 불러옵니다">
                       <div className="relative flex items-center">
                         <input
                           type="checkbox"
@@ -173,7 +188,7 @@ export default function StaffLogPage() {
                   </div>
                 </div>
 
-                <div className="h-4 mb-1 w-px bg-slate-700"></div>
+                <div className="mb-1 h-4 w-px bg-slate-700"></div>
 
                 {/* 수동 새로고침 버튼 */}
                 <button
@@ -215,7 +230,6 @@ export default function StaffLogPage() {
             <div className="space-y-2.5">
               {logs.map((log) => {
                 return (
-                  /* 여기에 새로운 최신 로그 전용 애니메이션 클래스 'animate-log-entry'를 추가했습니다 */
                   <article 
                     key={log.logId} 
                     className="animate-log-entry flex flex-col gap-2 rounded-xl border border-slate-700/50 bg-[#1e293b]/40 p-3 transition-colors hover:bg-[#1e293b]/80 sm:p-4"
