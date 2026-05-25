@@ -47,12 +47,12 @@ const formatTime = (dateString: string) => {
 };
 
 export default function StaffLogPage() {
-  // 캐시를 완전히 초기화하기 위해 QueryClient를 가져옵니다.
   const queryClient = useQueryClient();
 
+  // 연달아 2번 호출되는 버그 픽스: 
+  // rootMargin을 제거하고, threshold를 0.5로 설정하여 감지 요소가 화면에 50% 이상 확실히 보여야만 트리거되도록 수정
   const { ref, inView } = useInView({
-    threshold: 0,
-    rootMargin: "100px", // 화면 바닥에 닿기 100px 전에 미리 감지
+    threshold: 0.5,
   });
 
   const {
@@ -98,7 +98,6 @@ export default function StaffLogPage() {
                 </p>
               </div>
               
-              {/* 🔄 refetch가 아닌 완전 초기화(reset)로 동작 변경 */}
               <button
                 onClick={() => {
                   queryClient.resetQueries({ queryKey: ["adminLogs"] });
@@ -136,26 +135,30 @@ export default function StaffLogPage() {
             <div className="space-y-2.5">
               {logs.map((log) => {
                 return (
-                  // 하얀색 테두리를 없애고 자연스럽게 어두운 테두리와 백그라운드를 활용하여 가독성을 개선했습니다.
                   <article 
                     key={log.logId} 
-                    className="rounded-xl border border-slate-700/50 bg-[#1e293b]/40 p-3 transition-colors hover:bg-[#1e293b]/80 sm:p-4"
+                    className="flex flex-col gap-2 rounded-xl border border-slate-700/50 bg-[#1e293b]/40 p-3 transition-colors hover:bg-[#1e293b]/80 sm:p-4"
                   >
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        {/* 폰트 굵기(볼드) 해제 */}
-                        <p className="text-sm text-slate-200 font-normal break-keep">
-                          {log.message}
-                        </p>
-                        {/* 크기를 확 줄인 시간 표시 (날짜 제외, 소수점 추가) */}
-                        <p className="mt-1.5 text-[10px] text-slate-500 font-mono tracking-tight">
+                    {/* 상단 소제목 (헤더) 영역: 카테고리 전체, 시간, 로그 ID */}
+                    <div className="flex items-center justify-between border-b border-slate-700/50 pb-2">
+                      <div className="flex items-center gap-2.5">
+                        <span className="rounded bg-slate-800 px-2 py-1 text-[10px] font-bold text-slate-400 tracking-wider">
+                          {log.category}
+                        </span>
+                        <span className="text-[10px] text-slate-500 font-mono tracking-tight">
                           {formatTime(log.createdAt)}
-                        </p>
+                        </span>
                       </div>
-                      {/* 카테고리 앞 3글자만 표시 */}
-                      <span className="shrink-0 rounded bg-slate-800 px-2 py-1 text-[10px] font-bold text-slate-400 tracking-wider">
-                        {log.category.substring(0, 3).toUpperCase()}
+                      <span className="text-[10px] font-bold text-slate-600">
+                        #{log.logId}
                       </span>
+                    </div>
+
+                    {/* 메인 내용 영역 (볼드 해제) */}
+                    <div>
+                      <p className="text-sm text-slate-200 font-normal break-keep leading-relaxed">
+                        {log.message}
+                      </p>
                     </div>
                   </article>
                 );
