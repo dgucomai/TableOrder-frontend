@@ -40,7 +40,7 @@ export default function StaffLogPage() {
   // TanStack Query: 커서 기반 무한 스크롤 훅 적용
   const { ref, inView } = useInView({
     // 옵션: 요소가 화면에 나타나자마자가 아니라 10% 정도 보였을 때 호출 (중복 호출 방지에 도움)
-    threshold: 0.1, 
+    threshold: 0.5, 
   });
 
   const {
