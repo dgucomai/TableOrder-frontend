@@ -576,31 +576,31 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
             </div>
           </div>
           
-          <div className="p-4 sm:p-8 bg-slate-900/40 border-t border-white/5 flex flex-col sm:flex-row gap-3">
+          <div className="p-4 sm:p-8 bg-slate-900/40 border-t border-white/5 flex flex-row gap-2 sm:gap-3">
             <button 
               disabled={isEmptyTable}
               onClick={() => { setIsResetOpen(false); setIsDeleteOrderOpen(false); setIsEditTokenOpen(!isEditTokenOpen); setTokenDelta(""); }} 
-              className={`flex-1 py-4 sm:py-6 rounded-2xl font-black text-lg sm:text-xl flex items-center justify-center gap-3 transition-all ${
+              className={`flex-1 py-3 sm:py-6 rounded-2xl font-black text-[15px] sm:text-xl flex items-center justify-center gap-1.5 sm:gap-3 transition-all ${
                 isEmptyTable 
                   ? "bg-slate-800 text-slate-600 cursor-not-allowed opacity-50" 
                   : "bg-slate-700 hover:bg-slate-600 text-white active:scale-95"
               }`}
             >
-              <Coins size={20} className={isEmptyTable ? "text-slate-600" : "text-yellow-500"} /> 
-              토큰 수정
+              <Coins size={18} className={`sm:w-5 sm:h-5 ${isEmptyTable ? "text-slate-600" : "text-yellow-500"}`} /> 
+              <span className="whitespace-nowrap">토큰 수정</span>
             </button>
             
             <button 
               disabled={isEmptyTable}
               onClick={() => { setIsEditTokenOpen(false); setIsDeleteOrderOpen(false); setIsResetOpen(!isResetOpen); }} 
-              className={`flex-1 py-4 sm:py-6 rounded-2xl font-black text-lg sm:text-xl flex items-center justify-center gap-3 transition-all ${
+              className={`flex-1 py-3 sm:py-6 rounded-2xl font-black text-[15px] sm:text-xl flex items-center justify-center gap-1.5 sm:gap-3 transition-all ${
                 isEmptyTable 
                   ? "bg-slate-800 text-slate-600 cursor-not-allowed opacity-50" 
                   : "bg-orange-600 hover:bg-orange-500 text-white active:scale-95 shadow-lg shadow-orange-900/20"
               }`}
             >
-              <RotateCcw size={20} /> 
-              테이블 초기화
+              <RotateCcw size={18} className="sm:w-5 sm:h-5" /> 
+              <span className="whitespace-nowrap">테이블 초기화</span>
             </button>
           </div>
         </motion.div>
