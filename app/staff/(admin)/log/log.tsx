@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useEffect } from "react";
+import React, { useMemo, useEffect, useState } from "react";
 import { RefreshCw, Loader2 } from "lucide-react";
 import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 import { useInView } from "react-intersection-observer";
@@ -49,8 +49,10 @@ const formatTime = (dateString: string) => {
 export default function StaffLogPage() {
   const queryClient = useQueryClient();
 
-  // 연달아 2번 호출되는 버그 픽스: 
-  // rootMargin을 제거하고, threshold를 0.5로 설정하여 감지 요소가 화면에 50% 이상 확실히 보여야만 트리거되도록 수정
+  // 자동 새로고침 상태 관리
+  const [isAutoRefresh, setIsAutoRefresh] = useState(false);
+  const [countdown, setCountdown] = useState(2);
+
   const { ref, inView } = useInView({
     threshold: 0.5,
   });
@@ -73,11 +75,34 @@ export default function StaffLogPage() {
     gcTime: 0, 
   });
 
+  // 1. 자동 새로고침 타이머 Effect
   useEffect(() => {
-    if (inView && hasNextPage && !isFetching && !isFetchingNextPage) {
+    if (!isAutoRefresh) {
+      setCountdown(2); // 끄면 카운트다운 초기화
+      return;
+    }
+
+    const interval = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          // 0초 도달 시 데이터를 초기상태로 새로고침
+          queryClient.resetQueries({ queryKey: ["adminLogs"] });
+          return 2; // 다시 2초부터 시작
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [isAutoRefresh, queryClient]);
+
+  // 2. 무한 스크롤 제어 Effect
+  useEffect(() => {
+    // isAutoRefresh가 꺼져있을 때만 무한스크롤 트리거 작동
+    if (!isAutoRefresh && inView && hasNextPage && !isFetching && !isFetchingNextPage) {
       fetchNextPage();
     }
-  }, [inView, hasNextPage, isFetching, isFetchingNextPage, fetchNextPage]);
+  }, [isAutoRefresh, inView, hasNextPage, isFetching, isFetchingNextPage, fetchNextPage]);
 
   const logs = useMemo(() => {
     return data?.pages.flatMap((page) => page.logs) || [];
@@ -98,17 +123,52 @@ export default function StaffLogPage() {
                 </p>
               </div>
               
-              <button
-                onClick={() => {
-                  queryClient.resetQueries({ queryKey: ["adminLogs"] });
-                }}
-                disabled={isFetching}
-                className="ml-auto flex items-center gap-1.5 rounded-lg bg-slate-800 px-3 py-1.5 text-slate-300 transition-colors hover:bg-slate-700 disabled:opacity-50"
-                title="초기상태로 새로고침"
-              >
-                <RefreshCw size={16} className={isFetching ? "animate-spin text-orange-500" : ""} />
-                <span className="hidden text-xs font-bold sm:inline">새로고침</span>
-              </button>
+              {/* 우측 컨트롤 영역 */}
+              <div className="ml-auto flex items-center gap-3 sm:gap-4">
+                
+                {/* 자동 새로고침 토글 및 카운트다운 */}
+                <div className="flex items-center gap-2">
+                  {isAutoRefresh && (
+                    <div className="flex w-6 justify-center text-xs font-bold text-orange-500">
+                      {isFetching ? (
+                        <RefreshCw size={14} className="animate-spin" />
+                      ) : (
+                        <span>{countdown}s</span>
+                      )}
+                    </div>
+                  )}
+                  
+                  <label className="flex cursor-pointer items-center gap-2" title="2초마다 자동으로 최신 기록을 불러옵니다">
+                    <div className="relative flex items-center">
+                      <input
+                        type="checkbox"
+                        className="sr-only"
+                        checked={isAutoRefresh}
+                        onChange={(e) => setIsAutoRefresh(e.target.checked)}
+                      />
+                      <div className={`block h-5 w-9 rounded-full transition-colors ${isAutoRefresh ? 'bg-orange-500' : 'bg-slate-700'}`}></div>
+                      <div className={`absolute left-1 top-1 h-3 w-3 rounded-full bg-white transition-transform ${isAutoRefresh ? 'translate-x-4' : ''}`}></div>
+                    </div>
+                    <span className="hidden text-xs font-bold text-slate-400 sm:inline">자동 갱신</span>
+                  </label>
+                </div>
+
+                <div className="h-4 w-px bg-slate-700"></div>
+
+                {/* 수동 새로고침 버튼 */}
+                <button
+                  onClick={() => {
+                    queryClient.resetQueries({ queryKey: ["adminLogs"] });
+                    if (isAutoRefresh) setCountdown(2); // 수동으로 누르면 카운트다운 리셋
+                  }}
+                  disabled={isFetching}
+                  className="flex items-center gap-1.5 rounded-lg bg-slate-800 px-3 py-1.5 text-slate-300 transition-colors hover:bg-slate-700 disabled:opacity-50"
+                  title="초기상태로 새로고침"
+                >
+                  <RefreshCw size={16} className={isFetching && !isAutoRefresh ? "animate-spin text-orange-500" : ""} />
+                  <span className="hidden text-xs font-bold sm:inline">새로고침</span>
+                </button>
+              </div>
             </div>
           </div>
 
@@ -139,13 +199,12 @@ export default function StaffLogPage() {
                     key={log.logId} 
                     className="flex flex-col gap-2 rounded-xl border border-slate-700/50 bg-[#1e293b]/40 p-3 transition-colors hover:bg-[#1e293b]/80 sm:p-4"
                   >
-                    {/* 상단 소제목 (헤더) 영역: 카테고리 전체, 시간, 로그 ID */}
                     <div className="flex items-center justify-between border-b border-slate-700/50 pb-2">
                       <div className="flex items-center gap-2.5">
-                        <span className="rounded bg-slate-800 px-2 py-1 text-[10px] font-bold text-slate-400 tracking-wider">
+                        <span className="rounded bg-slate-800 px-2 py-1 text-[10px] font-bold tracking-wider text-slate-400">
                           {log.category}
                         </span>
-                        <span className="text-[10px] text-slate-500 font-mono tracking-tight">
+                        <span className="font-mono text-[10px] tracking-tight text-slate-500">
                           {formatTime(log.createdAt)}
                         </span>
                       </div>
@@ -154,9 +213,8 @@ export default function StaffLogPage() {
                       </span>
                     </div>
 
-                    {/* 메인 내용 영역 (볼드 해제) */}
                     <div>
-                      <p className="text-sm text-slate-200 font-normal break-keep leading-relaxed">
+                      <p className="break-keep text-sm font-normal leading-relaxed text-slate-200">
                         {log.message}
                       </p>
                     </div>
@@ -168,7 +226,9 @@ export default function StaffLogPage() {
                 {isFetchingNextPage ? (
                   <Loader2 className="animate-spin text-slate-400" size={20} />
                 ) : hasNextPage ? (
-                  <span className="text-xs text-slate-500">스크롤하여 더 보기</span>
+                  <span className="text-xs text-slate-500">
+                    {isAutoRefresh ? "자동 갱신 중에는 스크롤 기능이 일시 중지됩니다." : "스크롤하여 더 보기"}
+                  </span>
                 ) : (
                   <span className="text-xs text-slate-500">모든 기록을 불러왔습니다.</span>
                 )}
