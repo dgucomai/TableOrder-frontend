@@ -31,7 +31,7 @@ export default function MenuDetailView({
         const result = await response.json();
 
         if (result.success && result.data) {
-          // servedItems는 무시하고 preparingItems만 세팅
+          // servedItems는 제외하고 preparingItems만 세팅
           setPreparingOrders(result.data.preparingItems || []);
         }
       } catch (error) {
@@ -63,6 +63,7 @@ export default function MenuDetailView({
       <div className="mx-auto max-w-6xl p-4 md:p-6 space-y-6">
         <section className="rounded-[2rem] border border-slate-800 bg-[#1e293b] overflow-hidden shadow-2xl">
           <div className="flex flex-col md:flex-row gap-6 p-5 md:p-8 border-b border-white/5 bg-slate-800/40">
+            {/* 이미지 섹션 */}
             <div className="relative w-full md:w-56 h-48 md:h-56 shrink-0">
               {menu.imageUrl ? (
                 <img
@@ -79,6 +80,7 @@ export default function MenuDetailView({
                 </div>
               )}
 
+              {/* 품절 상태 오버레이 */}
               {menu.isSoldOut && (
                 <div className="absolute inset-0 flex items-center justify-center rounded-3xl z-10 pointer-events-none">
                   <span className="px-6 py-2.5 rounded-2xl bg-black/60 text-white text-lg md:text-xl font-black shadow-xl backdrop-blur-sm border border-white/10">
@@ -88,7 +90,7 @@ export default function MenuDetailView({
               )}
 
               <div className="absolute bottom-3 right-3 px-4 py-1.5 rounded-full bg-slate-900/90 text-slate-200 text-sm font-black shadow-lg backdrop-blur border border-white/10 z-20">
-                {(menu.price || 0).toLocaleString()}원
+                {menu.price.toLocaleString()}원
               </div>
             </div>
 
@@ -98,6 +100,7 @@ export default function MenuDetailView({
                   {menu.menuName}
                 </h1>
 
+                {/* 품절 토글 버튼 */}
                 <div className="mt-5 flex items-center gap-3">
                   <button
                     onClick={onToggleSoldOut}
