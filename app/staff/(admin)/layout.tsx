@@ -17,7 +17,7 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
     { href: "/staff/home", label: "홈" },
     { href: "/staff/menu", label: "메뉴" },
     { href: "/staff/log", label: "기록" },
-    { href: "/staff/sales", label: "매출 현황" },
+    { href: "/staff/sales", label: "매출" },
   ];
 
   useEffect(() => {

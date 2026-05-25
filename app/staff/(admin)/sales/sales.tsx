@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { staffFetch } from "@/lib/staffFetch";
-import { TrendingUp, Target, CheckCircle2, AlertCircle, Utensils, Receipt, ChevronDown } from 'lucide-react';
+import { TrendingUp, Target, CheckCircle2, AlertCircle, Utensils, ChevronDown } from 'lucide-react';
 
 // API에서 받아올 메뉴 데이터의 타입 정의
 interface MenuItem {
@@ -182,7 +182,7 @@ export default function SalesReport() {
             <div className="absolute -left-20 -bottom-20 h-64 w-64 rounded-full bg-blue-500/10 blur-[80px]" />
           </div>
 
-          {/* 메뉴별 판매 현황 섹션 (토글 & 표 디자인) */}
+          {/* 메뉴별 판매 현황 섹션 (반응형 Grid 디자인) */}
           <section className="rounded-3xl border border-slate-800 bg-[#1e293b]/50 overflow-hidden shadow-xl transition-all duration-300">
             {/* 토글 헤더 */}
             <button 
@@ -203,7 +203,7 @@ export default function SalesReport() {
               </div>
             </button>
             
-            {/* 펼쳐지는 표 영역 */}
+            {/* 펼쳐지는 표 영역 (모바일 최적화) */}
             {isMenuOpen && (
               <div className="p-4 md:p-6 bg-slate-900/30">
                 {isMenuLoading ? (
@@ -212,47 +212,54 @@ export default function SalesReport() {
                     <p className="font-bold text-slate-400">메뉴 데이터를 불러오는 중입니다...</p>
                   </div>
                 ) : (
-                  <div className="overflow-x-auto rounded-2xl border border-slate-700/50 bg-slate-800/20 shadow-inner">
-                    <table className="w-full text-left border-collapse">
-                      <thead>
-                        <tr className="bg-slate-800/50 text-slate-300 text-sm">
-                          <th className="py-4 px-6 font-black whitespace-nowrap">메뉴명</th>
-                          <th className="py-4 px-6 font-black text-center whitespace-nowrap">총 수량</th>
-                          <th className="py-4 px-6 font-black text-right whitespace-nowrap">총 금액</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-700/50">
-                        {menuStats.length > 0 ? (
-                          menuStats.map((item) => (
-                            <tr 
-                              key={item.menuItemId} 
-                              className="hover:bg-slate-700/30 transition-colors group"
-                            >
-                              <td className="py-4 px-6 font-bold text-slate-200">
-                                <div className="flex items-center gap-3">
-                                  <div className="h-1.5 w-1.5 rounded-full bg-orange-500/50 group-hover:bg-orange-400 transition-colors" />
-                                  {item.name}
-                                </div>
-                              </td>
-                              <td className="py-4 px-6 text-center">
-                                <span className="inline-flex items-center gap-1 bg-slate-900/50 px-3 py-1 rounded-full text-slate-300 font-bold border border-slate-700/50">
-                                  {item.totalItemCount} <span className="text-xs text-slate-500">개</span>
-                                </span>
-                              </td>
-                              <td className="py-4 px-6 text-right font-black text-orange-400">
-                                {item.subtotal.toLocaleString()} <span className="text-sm font-bold text-slate-500">원</span>
-                              </td>
-                            </tr>
-                          ))
-                        ) : (
-                          <tr>
-                            <td colSpan={3} className="py-12 text-center text-slate-500 font-bold">
-                              판매된 메뉴 데이터가 없습니다.
-                            </td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
+                  <div className="overflow-hidden rounded-2xl border border-slate-700/50 bg-slate-800/20 shadow-inner">
+                    
+                    {/* 데스크탑용 테이블 헤더 (모바일에서는 숨김) */}
+                    <div className="hidden md:grid grid-cols-12 gap-4 bg-slate-800/50 text-slate-300 border-b border-slate-700/50">
+                      <div className="col-span-6 py-4 px-6 font-black">메뉴명</div>
+                      <div className="col-span-3 py-4 px-6 font-black text-center">총 수량</div>
+                      <div className="col-span-3 py-4 px-6 font-black text-right">총 금액</div>
+                    </div>
+
+                    {/* 반응형 테이블 바디 */}
+                    <div className="divide-y divide-slate-700/50">
+                      {menuStats.length > 0 ? (
+                        menuStats.map((item) => (
+                          <div 
+                            key={item.menuItemId} 
+                            className="grid grid-cols-2 md:grid-cols-12 gap-y-4 gap-x-4 p-5 md:p-0 md:items-center hover:bg-slate-700/30 transition-colors group"
+                          >
+                            {/* 메뉴명: 모바일에서는 2칸(전체) 차지, 데스크탑은 6칸 */}
+                            <div className="col-span-2 md:col-span-6 md:py-4 md:px-6 font-bold text-slate-200">
+                              <div className="flex items-start md:items-center gap-3">
+                                <div className="h-1.5 w-1.5 rounded-full bg-orange-500/50 group-hover:bg-orange-400 transition-colors mt-2 md:mt-0 shrink-0" />
+                                <span className="leading-snug break-keep">{item.name}</span>
+                              </div>
+                            </div>
+                            
+                            {/* 총 수량: 모바일 1칸(좌측), 데스크탑 3칸 */}
+                            <div className="col-span-1 md:col-span-3 md:py-4 md:px-6 flex flex-col md:flex-row items-start md:items-center md:justify-center gap-1.5">
+                              <span className="text-[11px] font-bold text-slate-500 uppercase md:hidden">총 수량</span>
+                              <span className="inline-flex items-center gap-1 bg-slate-900/50 px-3 py-1.5 rounded-full text-slate-300 font-bold border border-slate-700/50">
+                                {item.totalItemCount} <span className="text-xs text-slate-500">개</span>
+                              </span>
+                            </div>
+                            
+                            {/* 총 금액: 모바일 1칸(우측), 데스크탑 3칸 */}
+                            <div className="col-span-1 md:col-span-3 md:py-4 md:px-6 flex flex-col items-end md:justify-center gap-1.5">
+                              <span className="text-[11px] font-bold text-slate-500 uppercase md:hidden">총 금액</span>
+                              <div className="font-black text-orange-400 text-right">
+                                <span className="text-lg md:text-base">{item.subtotal.toLocaleString()}</span> <span className="text-sm font-bold text-slate-500">원</span>
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="py-12 text-center text-slate-500 font-bold">
+                          판매된 메뉴 데이터가 없습니다.
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
