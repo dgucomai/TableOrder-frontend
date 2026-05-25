@@ -42,13 +42,13 @@ const getStatusConfig = (status: OrderStatus) => {
       return { 
         text: "입금 확인 대기 중", 
         subText: "(직원 호출 완료)", 
-        color: "text-red-500", 
-        bg: "bg-red-50", 
+        color: "text-pink-500", 
+        bg: "bg-pink-50", 
         icon: <AlertCircle size={16} /> 
       };
     case 'COOKING':
       return { 
-        text: "조리 중", 
+        text: "제공 중", 
         color: "text-orange-500", 
         bg: "bg-orange-50", 
         icon: <Clock size={16} /> 
@@ -63,15 +63,15 @@ const getStatusConfig = (status: OrderStatus) => {
     case 'REJECTED':
       return { 
         text: "승인 거절", 
-        color: "text-pink-500", 
-        bg: "bg-pink-100", 
+        color: "text-red-500", 
+        bg: "bg-red-100", 
         icon: <AlertCircle size={16} /> 
       };
     case 'CANCELLED':
       return { 
         text: "주문 취소", 
-        color: "text-pink-500", 
-        bg: "bg-pink-100", 
+        color: "text-gray-500", 
+        bg: "bg-gray-100", 
         icon: <AlertCircle size={16} /> 
       };
     default:
