@@ -90,7 +90,7 @@ export default function MenuDetailView({
               )}
 
               <div className="absolute bottom-3 right-3 px-4 py-1.5 rounded-full bg-slate-900/90 text-slate-200 text-sm font-black shadow-lg backdrop-blur border border-white/10 z-20">
-                {menu.price.toLocaleString()}원
+                {(menu.price ?? 0).toLocaleString()}원
               </div>
             </div>
 
