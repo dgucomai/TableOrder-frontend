@@ -107,7 +107,7 @@ export default function MenuListView({
                         {menu.menuName}
                       </h2>
                       <p className="text-sm md:text-base font-bold text-slate-400 mt-1">
-                        {menu.price.toLocaleString()}원
+                        {(menu.price ?? 0).toLocaleString()}원
                       </p>
 
                       <div className="mt-3 flex items-center gap-1.5 text-[11px] md:text-xs font-black text-slate-500">
