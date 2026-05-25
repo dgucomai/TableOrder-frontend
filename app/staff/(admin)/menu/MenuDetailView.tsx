@@ -23,7 +23,7 @@ interface PreparingOrderData {
   unitPrice: number;
   subtotal: number;
   itemStatus: string;
-  createdAt: string; // 시간 표시를 위해 필드 추가
+  createdAt: string;
 }
 
 export default function MenuDetailView({
@@ -57,11 +57,10 @@ export default function MenuDetailView({
     fetchMenuDetail();
   }, [menu.menuId]);
 
-  // [API 연동] 개별 메뉴 상태 변경 (TableDetailPopup 기능 이식)
+  // [API 연동] 개별 메뉴 상태 변경
   const updateItemStatus = async (orderItemId: number, currentItemStatus: string) => {
     if (currentItemStatus === "입금 확인 대기" || currentItemStatus === "거절됨" || currentItemStatus === "취소됨") return;
 
-    // 메뉴 상세 뷰의 '준비중 주문' 리스트이므로, SERVED로 변경
     const nextStatus = currentItemStatus === "PREPARING" ? "SERVED" : "PREPARING";
 
     try {
@@ -72,7 +71,6 @@ export default function MenuDetailView({
       });
       
       if (response.ok) {
-        // 성공 시 리스트에서 즉각 제거 (제공 완료 상태가 되므로 준비중 리스트에서 제외)
         if (nextStatus === "SERVED") {
           setPreparingOrders(prev => prev.filter(order => order.orderItemId !== orderItemId));
         } else {
@@ -90,16 +88,26 @@ export default function MenuDetailView({
     }
   };
 
-  // 시간 포맷팅 함수 (오전/오후 시:분:초)
+  // 시간 포맷팅 및 경과 시간(분) 계산 함수
   const formatOrderTime = (createdAt?: string) => {
     if (!createdAt) return "";
     const date = new Date(createdAt);
-    return date.toLocaleTimeString("ko-KR", {
+    
+    // 1. 시각 포맷 설정 (예: 오후 1:55:04)
+    const timeStr = date.toLocaleTimeString("ko-KR", {
       hour: "numeric",
       minute: "2-digit",
       second: "2-digit",
       hour12: true,
     });
+
+    // 2. 현재 시간과의 차이를 분(Minute) 단위로 계산
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.max(0, Math.floor(diffMs / (1000 * 60))); // 음수 방지
+
+    // 요구하신 형식대로 결합하여 반환
+    return `${timeStr} (${diffMins}분 경과)`;
   };
 
   return (
@@ -203,14 +211,14 @@ export default function MenuDetailView({
                       key={order.orderItemId}
                       className="flex flex-col gap-2 rounded-2xl border border-orange-500/20 bg-orange-500/10 py-4 px-4 md:px-5"
                     >
-                      {/* 좌측 상단 주문번호 및 시간 표시 */}
+                      {/* 좌측 상단 주문번호 및 수정된 시간 양식 표시 */}
                       <div className="flex items-center gap-2">
                         <div className="text-xs text-orange-200/60 font-bold">
                           #{order.orderId}
                         </div>
                         {order.createdAt && (
                           <div className="text-xs text-orange-200/60 font-medium tracking-wide">
-                            ({formatOrderTime(order.createdAt)})
+                            {formatOrderTime(order.createdAt)}
                           </div>
                         )}
                       </div>
@@ -218,7 +226,7 @@ export default function MenuDetailView({
                       {/* 하단 내용 (테이블, 수량, 버튼) 가로 정렬 */}
                       <div className="flex items-center justify-between gap-4 mt-1">
                         
-                        {/* 테이블 번호 영역: 박스 형태로 감싸서 돋보이게 처리 */}
+                        {/* 테이블 번호 영역 */}
                         <div className="flex items-center gap-2 md:gap-3">
                           <div className="flex items-center justify-center min-w-[4rem] px-3 py-1.5 rounded-xl bg-slate-800/80 border border-slate-700/50 shadow-sm">
                             <span className="text-xl md:text-2xl font-black text-white whitespace-nowrap">
@@ -231,7 +239,7 @@ export default function MenuDetailView({
                         </div>
 
                         <div className="flex items-center gap-3 md:gap-6">
-                          {/* 수량 영역: 1개일 땐 기본 스타일, 2개 이상일 땐 붉은색 강조 스타일 박스 적용 */}
+                          {/* 수량 영역 */}
                           <div
                             className={`flex items-center justify-center px-4 py-1.5 rounded-xl border shadow-sm ${
                               order.quantity !== 1
