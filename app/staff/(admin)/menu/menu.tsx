@@ -17,35 +17,25 @@ export default function StaffMenuPage() {
   useEffect(() => {
     const fetchMenus = async () => {
       setIsLoading(true);
-      
-      // 타입 추론 에러 방지를 위한 any[] 선언
+
       let originMenus: any[] = [];
       let staffData: any[] = [];
 
-      // [1] 일반 메뉴 API (독립 실행)
-      try {
-        const menuRes = await fetch("/api/menus");
-        if (!menuRes.ok) throw new Error(`상태 코드: ${menuRes.status}`);
-        const menuResult = await menuRes.json();
-        
-        if (menuResult.success && menuResult.data?.menus) {
-          originMenus = menuResult.data.menus;
-        }
-      } catch (error) {
-        console.error("❌ /api/menus 기본 메뉴 호출 실패 (이곳이 문제였을 수 있습니다):", error);
+      const [menuResult, staffResult] = await Promise.allSettled([
+        fetch("/api/menus").then((r) => { if (!r.ok) throw new Error(`${r.status}`); return r.json(); }),
+        staffFetch("/api/staff/menus").then((r) => { if (!r.ok) throw new Error(`${r.status}`); return r.json(); }),
+      ]);
+
+      if (menuResult.status === "fulfilled" && menuResult.value?.data?.menus) {
+        originMenus = menuResult.value.data.menus;
+      } else if (menuResult.status === "rejected") {
+        console.error("❌ /api/menus 실패:", menuResult.reason);
       }
 
-      // [2] 스태프 현황 API (1번 성공 여부와 무조건 무관하게 독립 실행!)
-      try {
-        const staffRes = await staffFetch("/api/staff/menus");
-        if (!staffRes.ok) throw new Error(`상태 코드: ${staffRes.status}`);
-        const staffResult = await staffRes.json();
-        
-        if (staffResult.success && staffResult.data) {
-          staffData = staffResult.data;
-        }
-      } catch (error) {
-        console.error("❌ /api/staff/menus 스태프 현황 호출 실패:", error);
+      if (staffResult.status === "fulfilled" && staffResult.value?.data) {
+        staffData = staffResult.value.data;
+      } else if (staffResult.status === "rejected") {
+        console.error("❌ /api/staff/menus 실패:", staffResult.reason);
       }
 
       // [3] 안전한 병합 로직
