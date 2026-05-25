@@ -62,6 +62,7 @@ export default function StaffMenuPage() {
             countPreparing: staffItem ? staffItem.countPreparing : 0,
             countServed: staffItem ? staffItem.countServed : 0,
             subtotal: staffItem ? staffItem.subtotal : 0,
+            totalItemCount: staffItem ? staffItem.totalItemCount : 0,
           };
         });
       } else if (staffData.length > 0) {
