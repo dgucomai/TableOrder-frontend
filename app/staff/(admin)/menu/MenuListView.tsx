@@ -2,15 +2,13 @@
 
 import React, { useMemo } from "react";
 import { ImageOff, ShoppingBag } from "lucide-react";
-import { MenuItem, StaffOrderItem } from "./types";
-import { getOrdersByMenu, getPreparingQuantity } from "./utils";
+import { MenuItem } from "./types";
 
 interface MenuListViewProps {
   menus: MenuItem[];
   categories: string[];
   activeCategory: string;
   isLoading: boolean;
-  orders: StaffOrderItem[];
   onCategoryChange: (category: string) => void;
   onMenuClick: (menu: MenuItem) => void;
 }
@@ -20,7 +18,6 @@ export default function MenuListView({
   categories,
   activeCategory,
   isLoading,
-  orders,
   onCategoryChange,
   onMenuClick,
 }: MenuListViewProps) {
@@ -67,8 +64,8 @@ export default function MenuListView({
           <>
             <section className="flex flex-col gap-3 md:gap-4">
               {filteredMenus.map((menu) => {
-                const preparingQuantity = getPreparingQuantity(orders, menu);
-                const menuOrderCount = getOrdersByMenu(orders, menu).length;
+                const preparingQuantity = menu.countPreparing;
+                const menuOrderCount = menu.countServed;
 
                 return (
                   <button
@@ -114,7 +111,7 @@ export default function MenuListView({
                       </p>
 
                       <div className="mt-3 flex items-center gap-1.5 text-[11px] md:text-xs font-black text-slate-500">
-                        <ShoppingBag size={12} /> 총 {menuOrderCount}건
+                        <ShoppingBag size={12} /> 제공 완료 {menuOrderCount}건
                       </div>
                     </div>
 
