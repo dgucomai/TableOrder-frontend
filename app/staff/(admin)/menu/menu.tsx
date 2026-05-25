@@ -56,7 +56,8 @@ export default function StaffMenuPage() {
             menuName: originItem.menuName || "이름 없음",
             price: originItem.price || 0,
             description: originItem.description || "",
-            imageUrl: originItem.imageUrl || null,
+            // imageUrl 속성에 API의 imageUrl360 값을 매핑합니다.
+            imageUrl: originItem.imageUrl360 || null,
             isSoldOut: originItem.isSoldOut || false,
             countPreparing: staffItem ? staffItem.countPreparing : 0,
             countServed: staffItem ? staffItem.countServed : 0,
