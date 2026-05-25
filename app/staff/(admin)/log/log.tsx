@@ -64,7 +64,7 @@ export default function StaffLogPage() {
     isFetchingNextPage,
     isFetching,
     status,
-    refetch // 깜박임 없는 새로고침을 위해 refetch 함수 추출
+    refetch
   } = useInfiniteQuery({
     queryKey: ["adminLogs"], 
     queryFn: ({ pageParam }) => fetchLogs(pageParam as number | undefined),
@@ -76,19 +76,18 @@ export default function StaffLogPage() {
     gcTime: 0, 
   });
 
-  // 1. 자동 새로고침 타이머 Effect (refetch를 사용하여 깜박임 제거)
+  // 1. 자동 새로고침 타이머 Effect
   useEffect(() => {
     if (!isAutoRefresh) {
-      setCountdown(2); // 끄면 카운트다운 초기화
+      setCountdown(2);
       return;
     }
 
     const interval = setInterval(() => {
       setCountdown((prev) => {
         if (prev <= 1) {
-          // 캐시를 지우지 않고 백그라운드에서 갱신하므로 UI가 깜박이지 않습니다.
           refetch();
-          return 2; // 다시 2초부터 시작
+          return 2;
         }
         return prev - 1;
       });
@@ -110,6 +109,24 @@ export default function StaffLogPage() {
 
   return (
     <div className="min-h-full bg-[#0f172a] px-3 py-4 sm:px-6 lg:px-10">
+      
+      {/* 부드러운 데이터 추가 애니메이션을 위한 컴포넌트 전용 스타일 */}
+      <style>{`
+        @keyframes logSlideIn {
+          from {
+            opacity: 0;
+            transform: translateY(-12px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        .animate-log-entry {
+          animation: logSlideIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+      `}</style>
+
       <div className="mx-auto max-w-5xl">
         <section className="rounded-3xl border border-slate-800 bg-[#1e293b]/70 p-3 sm:p-5">
           <div className="mb-3">
@@ -126,7 +143,7 @@ export default function StaffLogPage() {
               {/* 우측 컨트롤 영역 */}
               <div className="ml-auto flex items-end gap-3 sm:gap-4">
                 
-                {/* 자동 새로고침 토글 (상단에 "자동" 텍스트 배치) */}
+                {/* 자동 새로고침 토글 */}
                 <div className="flex flex-col items-center gap-1">
                   <span className="text-[10px] font-black text-slate-400 tracking-wider">자동</span>
                   
@@ -161,8 +178,6 @@ export default function StaffLogPage() {
                 {/* 수동 새로고침 버튼 */}
                 <button
                   onClick={() => {
-                    // 수동 클릭 시에도 깜박임을 없애고 싶다면 refetch()로 변경 가능합니다.
-                    // 기존 데이터 정리를 위해 유지하되, 자동 갱신 중이 아닐 때만 스피너가 돌도록 유연화
                     queryClient.resetQueries({ queryKey: ["adminLogs"] });
                     if (isAutoRefresh) setCountdown(2);
                   }}
@@ -200,9 +215,10 @@ export default function StaffLogPage() {
             <div className="space-y-2.5">
               {logs.map((log) => {
                 return (
+                  /* 여기에 새로운 최신 로그 전용 애니메이션 클래스 'animate-log-entry'를 추가했습니다 */
                   <article 
                     key={log.logId} 
-                    className="flex flex-col gap-2 rounded-xl border border-slate-700/50 bg-[#1e293b]/40 p-3 transition-colors hover:bg-[#1e293b]/80 sm:p-4"
+                    className="animate-log-entry flex flex-col gap-2 rounded-xl border border-slate-700/50 bg-[#1e293b]/40 p-3 transition-colors hover:bg-[#1e293b]/80 sm:p-4"
                   >
                     <div className="flex items-center justify-between border-b border-slate-700/50 pb-2">
                       <div className="flex items-center gap-2.5">
