@@ -694,7 +694,7 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
                 <div className="space-y-3">
                   <button disabled={!deleteReason.trim()} onClick={executeDeleteGroup}
                     className={`w-full py-5 rounded-xl font-black text-lg text-white transition-all active:scale-95 ${!deleteReason.trim() ? "bg-slate-700 cursor-not-allowed opacity-50" : "bg-red-600 hover:bg-red-500 shadow-xl shadow-red-900/20"}`}
-                  >전체 취소하기</button>
+                  >주문 거절하기</button>
                   <button onClick={() => setIsDeleteOrderOpen(false)} className="w-full bg-slate-700 text-slate-300 hover:bg-slate-600 py-4 rounded-xl font-bold transition-all">돌아가기</button>
                 </div>
               </div>
