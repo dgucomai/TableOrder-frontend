@@ -63,7 +63,8 @@ export default function StaffLogPage() {
     hasNextPage,
     isFetchingNextPage,
     isFetching,
-    status
+    status,
+    refetch // 깜박임 없는 새로고침을 위해 refetch 함수 추출
   } = useInfiniteQuery({
     queryKey: ["adminLogs"], 
     queryFn: ({ pageParam }) => fetchLogs(pageParam as number | undefined),
@@ -75,7 +76,7 @@ export default function StaffLogPage() {
     gcTime: 0, 
   });
 
-  // 1. 자동 새로고침 타이머 Effect
+  // 1. 자동 새로고침 타이머 Effect (refetch를 사용하여 깜박임 제거)
   useEffect(() => {
     if (!isAutoRefresh) {
       setCountdown(2); // 끄면 카운트다운 초기화
@@ -85,8 +86,8 @@ export default function StaffLogPage() {
     const interval = setInterval(() => {
       setCountdown((prev) => {
         if (prev <= 1) {
-          // 0초 도달 시 데이터를 초기상태로 새로고침
-          queryClient.resetQueries({ queryKey: ["adminLogs"] });
+          // 캐시를 지우지 않고 백그라운드에서 갱신하므로 UI가 깜박이지 않습니다.
+          refetch();
           return 2; // 다시 2초부터 시작
         }
         return prev - 1;
@@ -94,11 +95,10 @@ export default function StaffLogPage() {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [isAutoRefresh, queryClient]);
+  }, [isAutoRefresh, refetch]);
 
   // 2. 무한 스크롤 제어 Effect
   useEffect(() => {
-    // isAutoRefresh가 꺼져있을 때만 무한스크롤 트리거 작동
     if (!isAutoRefresh && inView && hasNextPage && !isFetching && !isFetchingNextPage) {
       fetchNextPage();
     }
@@ -113,7 +113,7 @@ export default function StaffLogPage() {
       <div className="mx-auto max-w-5xl">
         <section className="rounded-3xl border border-slate-800 bg-[#1e293b]/70 p-3 sm:p-5">
           <div className="mb-3">
-            <div className="flex w-full items-center justify-between">
+            <div className="flex w-full items-end justify-between">
               <div>
                 <h2 className="text-base font-black text-white sm:text-xl">
                   전체 운영 기록
@@ -124,42 +124,47 @@ export default function StaffLogPage() {
               </div>
               
               {/* 우측 컨트롤 영역 */}
-              <div className="ml-auto flex items-center gap-3 sm:gap-4">
+              <div className="ml-auto flex items-end gap-3 sm:gap-4">
                 
-                {/* 자동 새로고침 토글 및 카운트다운 */}
-                <div className="flex items-center gap-2">
-                  {isAutoRefresh && (
-                    <div className="flex w-6 justify-center text-xs font-bold text-orange-500">
-                      {isFetching ? (
-                        <RefreshCw size={14} className="animate-spin" />
-                      ) : (
-                        <span>{countdown}s</span>
-                      )}
-                    </div>
-                  )}
+                {/* 자동 새로고침 토글 (상단에 "자동" 텍스트 배치) */}
+                <div className="flex flex-col items-center gap-1">
+                  <span className="text-[10px] font-black text-slate-400 tracking-wider">자동</span>
                   
-                  <label className="flex cursor-pointer items-center gap-2" title="2초마다 자동으로 최신 기록을 불러옵니다">
-                    <div className="relative flex items-center">
-                      <input
-                        type="checkbox"
-                        className="sr-only"
-                        checked={isAutoRefresh}
-                        onChange={(e) => setIsAutoRefresh(e.target.checked)}
-                      />
-                      <div className={`block h-5 w-9 rounded-full transition-colors ${isAutoRefresh ? 'bg-orange-500' : 'bg-slate-700'}`}></div>
-                      <div className={`absolute left-1 top-1 h-3 w-3 rounded-full bg-white transition-transform ${isAutoRefresh ? 'translate-x-4' : ''}`}></div>
-                    </div>
-                    <span className="hidden text-xs font-bold text-slate-400 sm:inline">자동 갱신</span>
-                  </label>
+                  <div className="flex items-center gap-1.5 h-6">
+                    {isAutoRefresh && (
+                      <div className="flex w-6 justify-center text-xs font-bold text-orange-500">
+                        {isFetching ? (
+                          <RefreshCw size={14} className="animate-spin" />
+                        ) : (
+                          <span>{countdown}s</span>
+                        )}
+                      </div>
+                    )}
+                    
+                    <label className="flex cursor-pointer items-center" title="2초마다 자동으로 최신 기록을 불러옵니다">
+                      <div className="relative flex items-center">
+                        <input
+                          type="checkbox"
+                          className="sr-only"
+                          checked={isAutoRefresh}
+                          onChange={(e) => setIsAutoRefresh(e.target.checked)}
+                        />
+                        <div className={`block h-5 w-9 rounded-full transition-colors ${isAutoRefresh ? 'bg-orange-500' : 'bg-slate-700'}`}></div>
+                        <div className={`absolute left-1 top-1 h-3 w-3 rounded-full bg-white transition-transform ${isAutoRefresh ? 'translate-x-4' : ''}`}></div>
+                      </div>
+                    </label>
+                  </div>
                 </div>
 
-                <div className="h-4 w-px bg-slate-700"></div>
+                <div className="h-4 mb-1 w-px bg-slate-700"></div>
 
                 {/* 수동 새로고침 버튼 */}
                 <button
                   onClick={() => {
+                    // 수동 클릭 시에도 깜박임을 없애고 싶다면 refetch()로 변경 가능합니다.
+                    // 기존 데이터 정리를 위해 유지하되, 자동 갱신 중이 아닐 때만 스피너가 돌도록 유연화
                     queryClient.resetQueries({ queryKey: ["adminLogs"] });
-                    if (isAutoRefresh) setCountdown(2); // 수동으로 누르면 카운트다운 리셋
+                    if (isAutoRefresh) setCountdown(2);
                   }}
                   disabled={isFetching}
                   className="flex items-center gap-1.5 rounded-lg bg-slate-800 px-3 py-1.5 text-slate-300 transition-colors hover:bg-slate-700 disabled:opacity-50"
