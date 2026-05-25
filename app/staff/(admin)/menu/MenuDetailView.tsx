@@ -58,12 +58,7 @@ export default function MenuDetailView({
 
   // [API 연동] 개별 메뉴 상태 변경 (TableDetailPopup 기능 이식)
   const updateItemStatus = async (orderItemId: number, currentItemStatus: string) => {
-    if (
-      currentItemStatus === "입금 확인 대기" ||
-      currentItemStatus === "거절됨" ||
-      currentItemStatus === "취소됨"
-    )
-      return;
+    if (currentItemStatus === "입금 확인 대기" || currentItemStatus === "거절됨" || currentItemStatus === "취소됨") return;
 
     // 메뉴 상세 뷰의 '준비중 주문' 리스트이므로, SERVED로 변경
     const nextStatus = currentItemStatus === "PREPARING" ? "SERVED" : "PREPARING";
@@ -74,21 +69,17 @@ export default function MenuDetailView({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: nextStatus }),
       });
-
+      
       if (response.ok) {
         // 성공 시 리스트에서 즉각 제거 (제공 완료 상태가 되므로 준비중 리스트에서 제외)
         if (nextStatus === "SERVED") {
-          setPreparingOrders((prev) =>
-            prev.filter((order) => order.orderItemId !== orderItemId)
-          );
+          setPreparingOrders(prev => prev.filter(order => order.orderItemId !== orderItemId));
         } else {
-          setPreparingOrders((prev) =>
-            prev.map((order) =>
-              order.orderItemId === orderItemId
-                ? { ...order, itemStatus: nextStatus }
-                : order
-            )
-          );
+          setPreparingOrders(prev => prev.map(order => 
+            order.orderItemId === orderItemId 
+              ? { ...order, itemStatus: nextStatus } 
+              : order
+          ));
         }
       } else {
         alert("상태 변경에 실패했습니다.");
@@ -193,48 +184,41 @@ export default function MenuDetailView({
                   현재 대기 중인 주문이 없습니다.
                 </div>
               ) : (
-                <div className="space-y-2">
-                  {preparingOrders.map((order) => (
+                <div className="space-y-3">
+                  {preparingOrders.map((order, index) => (
                     <div
                       key={order.orderItemId}
-                      className="flex items-center justify-between gap-3 rounded-xl border border-orange-500/20 bg-orange-500/10 p-3"
+                      className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 rounded-2xl border border-orange-500/20 bg-orange-500/10 p-4 md:p-5"
                     >
-                      {/* 좌측 영역: 테이블 번호 & 미니 주문번호 */}
-                      <div className="flex items-baseline gap-2 min-w-0">
-                        <span className="text-lg md:text-xl font-black text-white shrink-0">
-                          {order.tableNumber !== undefined
-                            ? order.tableNumber
-                            : order.tableId}
-                        </span>
-                        <span className="text-[10px] text-orange-200/30 font-light truncate">
-                          #{order.orderId}
-                        </span>
+                      <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 rounded-2xl bg-orange-500 text-white flex items-center justify-center font-black shrink-0">
+                          {index + 1}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-2xl font-black text-white">
+                            {order.tableNumber !== undefined ? `${order.tableNumber}번 테이블` : `테이블 ID: ${order.tableId}`}
+                          </p>
+                          <p className="text-sm text-orange-200/70 font-bold truncate">
+                            주문번호 #{order.orderId}
+                          </p>
+                        </div>
                       </div>
 
-                      {/* 우측 영역: 수량 & 상태 변경 버튼 */}
-                      <div className="flex items-center gap-4 shrink-0">
-                        {/* 수량이 1이 아닐 경우 붉은색 텍스트로 강조 */}
-                        <span
-                          className={`text-xl font-black ${
-                            order.quantity !== 1
-                              ? "text-red-500"
-                              : "text-slate-200"
-                          }`}
-                        >
-                          {order.quantity}
-                        </span>
+                      <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-end">
+                        <div className="rounded-xl bg-slate-950/30 px-4 py-3 text-sm md:text-base font-black text-white whitespace-nowrap overflow-x-auto">
+                          <span className="text-slate-400">수량</span>
+                          <span className="mx-2 text-slate-600">|</span>
+                          <span>{order.quantity}개</span>
+                        </div>
 
                         {/* 상태 변경 버튼 */}
-                        <button
-                          onClick={() =>
-                            updateItemStatus(order.orderItemId, order.itemStatus)
-                          }
-                          className={`px-4 py-2 sm:px-5 rounded-lg font-black text-xs sm:text-sm transition-all whitespace-nowrap ${
-                            order.itemStatus === "SERVED"
-                              ? "bg-slate-700 text-slate-400 hover:bg-slate-600 active:scale-95 shadow-inner"
-                              : "bg-orange-500 text-white hover:bg-orange-400 active:scale-95 shadow-lg shadow-orange-900/20"
-                          }`}
-                        >
+                        <button 
+                          onClick={() => updateItemStatus(order.orderItemId, order.itemStatus)} 
+                          className={`px-4 py-3 sm:px-6 rounded-xl font-black text-xs sm:text-sm transition-all whitespace-nowrap ${
+                            order.itemStatus === "SERVED" 
+                            ? "bg-slate-700 text-slate-400 hover:bg-slate-600 active:scale-95 shadow-inner" 
+                            : "bg-orange-500 text-white hover:bg-orange-400 active:scale-95 shadow-lg shadow-orange-900/20"
+                          }`}>
                           {order.itemStatus === "PREPARING" ? "준비 중" : "제공 완료"}
                         </button>
                       </div>
