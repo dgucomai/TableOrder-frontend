@@ -13,9 +13,10 @@ interface Order {
   name: string;
   quantity: number;
   price: number;
-  time: string;
-  orderStatus: "입금 확인 대기" | "준비 중" | "제공 완료"; // 전체 주문 상태
-  itemStatus: "입금 확인 대기" | "준비 중" | "제공 완료"; // 개별 메뉴 상태
+  time: string;       // 화면 표시용 (HH:MM)
+  createdAt: string;  // 정렬용 원본 시간 데이터
+  orderStatus: "입금 확인 대기" | "준비 중" | "제공 완료" | "거절됨"; // 전체 주문 상태
+  itemStatus: "입금 확인 대기" | "준비 중" | "제공 완료" | "거절됨"; // 개별 메뉴 상태
   isTokenPayment?: boolean;
 }
 
@@ -38,7 +39,7 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
   const [refreshKey, setRefreshKey] = useState(0);
 
   const [isDeleteOrderOpen, setIsDeleteOrderOpen] = useState(false);
-  const [timeToDelete, setTimeToDelete] = useState<string | null>(null);
+  const [orderIdToDelete, setOrderIdToDelete] = useState<number | null>(null);
   const [deleteReason, setDeleteReason] = useState("");
 
   const [activeCalls, setActiveCalls] = useState<CallInfo[]>([]);
@@ -57,16 +58,19 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
       case "PREPARING": 
       case "COOKING": return "준비 중";
       case "COMPLETED": return "제공 완료";
+      case "REJECTED": return "거절됨";
       default: return "준비 중";
     }
   };
 
   // 하위 메뉴(Item)의 상태를 매핑하는 헬퍼 함수
   const mapItemStatus = (itemStatus: string | null, orderStatus: string) => {
+    if (orderStatus === "REJECTED") return "거절됨";
     if (orderStatus === "PAYMENT_PENDING" && !itemStatus) return "입금 확인 대기";
     switch (itemStatus) {
       case "SERVED": return "제공 완료";
       case "PREPARING": return "준비 중";
+      case "REJECTED": return "거절됨";
       default: return orderStatus === "PAYMENT_PENDING" ? "입금 확인 대기" : "준비 중";
     }
   };
@@ -135,6 +139,7 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
                   quantity: item.quantity,
                   price: item.unitPrice,
                   time: timeStr,
+                  createdAt: order.createdAt,
                   orderStatus: oStatusStr as Order["orderStatus"],
                   itemStatus: mapItemStatus(item.itemStatus, order.orderStatus) as Order["itemStatus"],
                   isTokenPayment: false
@@ -154,7 +159,7 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
     const timer = setInterval(() => setCurrentTime(new Date()), 60000);
     if (tableId) fetchTableDetail();
     return () => clearInterval(timer);
-  }, [tableId, refreshKey]);
+  }, [tableId, refreshKey, fetchTableDetail]);
 
   const triggerRefresh = ({ tableId: id }: any) => { if (id === tableId) setRefreshKey((k) => k + 1); };
 
@@ -167,15 +172,21 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
   useSseEvent("TABLE_STATUS_CHANGED",    triggerRefresh);
   useSseEvent("ORDER_REJECTED", ({ tableId: id, orderId }: any) => {
     if (id !== tableId) return;
-    setOrders((prev) => prev.filter((o) => o.orderId !== orderId));
+    setOrders((prev) => prev.map((o) => o.orderId === orderId ? { ...o, orderStatus: "거절됨", itemStatus: "거절됨" } : o));
   });
   useSseEvent("ORDER_STATUS_CHANGED", ({ tableId: id, orderId, status }: any) => {
     if (id !== tableId) return;
     const mapped = mapOrderStatus(status) as Order["orderStatus"];
-    setOrders((prev) => prev.map((o) => o.orderId === orderId ? { ...o, orderStatus: mapped } : o));
+    setOrders((prev) => prev.map((o) => 
+      o.orderId === orderId 
+        ? { ...o, orderStatus: mapped, ...(mapped === '거절됨' ? { itemStatus: '거절됨' } : {}) } 
+        : o
+    ));
   });
   useSseEvent("ITEM_STATUS_CHANGED", ({ orderId, itemId, status }: any) => {
-    const itemStatus = status === "SERVED" ? "제공 완료" : "준비 중";
+    let itemStatus = status === "SERVED" ? "제공 완료" : "준비 중";
+    if (status === "REJECTED") itemStatus = "거절됨";
+    
     setOrders((prev) => {
       const hasItem = prev.some((o) => o.orderId === orderId && o.orderItemId === itemId);
       if (!hasItem) return prev;
@@ -187,7 +198,7 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
 
   const totalAmount = useMemo(() =>
     orders
-      .filter((o) => o.orderStatus !== "입금 확인 대기")
+      .filter((o) => o.orderStatus !== "입금 확인 대기" && o.orderStatus !== "거절됨")
       .reduce((sum, o) => sum + o.price * o.quantity, 0),
     [orders]
   );
@@ -235,39 +246,31 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
     }
   };
 
-  const confirmGroupDeposit = async (time: string) => {
-    const groupOrders = groupedOrders[time].filter((o: Order) => o.orderStatus === "입금 확인 대기");
-    const uniqueOrderIds = Array.from(new Set(groupOrders.map((o: Order) => o.orderId)));
-
-    if (uniqueOrderIds.length === 0) return;
-
+  const confirmGroupDeposit = async (orderId: number) => {
     try {
-      const results = await Promise.all(
-        uniqueOrderIds.map(async (orderId) => {
-          const response = await staffFetch(`/api/staff/orders/${orderId}/approve`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-          });
-          
-          if (!response.ok) throw new Error("서버 응답 오류");
-          return response.json(); 
-        })
-      );
+      const response = await staffFetch(`/api/staff/orders/${orderId}/approve`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+      });
+      
+      const result = await response.json().catch(() => ({}));
 
-      const allSuccess = results.every(result => result.success);
-
-      if (allSuccess) {
+      if (response.ok || result.success) {
         setOrders(prev => prev.map(order => 
-          order.time === time && order.orderStatus === "입금 확인 대기" 
+          order.orderId === orderId && order.orderStatus === "입금 확인 대기" 
             ? { ...order, orderStatus: "준비 중", itemStatus: "준비 중" } 
             : order
         ));
         
-        setActiveCalls(prev => prev.filter(call => call.time !== time && call.type !== "입금 확인"));
+        // 동일한 시간대의 입금 확인 호출(Payment Request) 제거 처리
+        const orderTime = groupedOrders[orderId]?.[0]?.time;
+        if (orderTime) {
+          setActiveCalls(prev => prev.filter(call => !(call.time === orderTime && call.type === "입금 확인")));
+        }
         
         alert("입금 확인이 완료되었습니다.");
       } else {
-        alert("일부 주문의 입금 승인 처리에 실패했습니다.");
+        alert("입금 승인 처리에 실패했습니다.");
       }
     } catch (e) {
       console.error(e);
@@ -277,7 +280,7 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
 
   // [API 연동] 개별 메뉴 상태 변경 (준비 중 <-> 제공 완료)
   const updateItemStatus = async (orderItemId: number, currentItemStatus: string) => {
-    if (currentItemStatus === "입금 확인 대기") return;
+    if (currentItemStatus === "입금 확인 대기" || currentItemStatus === "거절됨") return;
 
     // 현재 상태에 따라 다음 상태 결정 (토글 방식)
     const nextStatus = currentItemStatus === "준비 중" ? "SERVED" : "PREPARING";
@@ -293,7 +296,7 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
       if (response.ok) {
         setOrders(prev => prev.map(order => 
           order.orderItemId === orderItemId 
-            ? { ...order, itemStatus: nextStatusKr } 
+            ? { ...order, itemStatus: nextStatusKr as Order["itemStatus"] } 
             : order
         ));
       } else {
@@ -304,38 +307,35 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
     }
   };
 
-  const handleDeleteGroupClick = (time: string) => { 
+  const handleDeleteGroupClick = (orderId: number) => { 
     setIsEditTokenOpen(false); 
     setIsResetOpen(false); 
-    setTimeToDelete(time); 
+    setOrderIdToDelete(orderId); 
     setDeleteReason(""); 
     setIsDeleteOrderOpen(true); 
   };
 
   const executeDeleteGroup = async () => {
-    if (!timeToDelete) return; 
+    if (orderIdToDelete === null) return; 
     
-    const groupOrders = orders.filter(o => o.time === timeToDelete && o.orderStatus === "입금 확인 대기");
-    const uniqueOrderIds = Array.from(new Set(groupOrders.map(o => o.orderId)));
-
     try {
-      const results = await Promise.all(
-        uniqueOrderIds.map(async (orderId) => {
-          const response = await staffFetch(`/api/staff/orders/${orderId}`, {
-            method: "DELETE",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ reason: deleteReason }),
-          });
+      const response = await staffFetch(`/api/staff/orders/${orderIdToDelete}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason: deleteReason }),
+      });
 
-          if (!response.ok) throw new Error("서버 응답 오류");
-          return response.json();
-        })
-      );
-
-      setOrders(prev => prev.filter(order => order.time !== timeToDelete));
+      if (!response.ok) throw new Error("서버 응답 오류");
+      
+      // 삭제된 주문을 로컬에서 "거절됨" 상태로 전환 처리
+      setOrders(prev => prev.map(order => 
+        order.orderId === orderIdToDelete 
+          ? { ...order, orderStatus: "거절됨", itemStatus: "거절됨" } 
+          : order
+      ));
       
       setIsDeleteOrderOpen(false); 
-      setTimeToDelete(null); 
+      setOrderIdToDelete(null); 
       setDeleteReason(""); 
       
       alert("해당 주문이 성공적으로 취소되었습니다.");
@@ -410,11 +410,21 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
     }
   };
 
-  const groupedOrders = orders.reduce((acc: any, order) => {
-    if (!acc[order.time]) acc[order.time] = [];
-    acc[order.time].push(order);
+  // orderId 기준으로 주문 그룹화
+  const groupedOrders = orders.reduce((acc: Record<number, Order[]>, order) => {
+    if (!acc[order.orderId]) acc[order.orderId] = [];
+    acc[order.orderId].push(order);
     return acc;
   }, {});
+
+  // 생성 시간을 기준으로 내림차순 정렬하여 최신 주문이 상단에 배치되도록 처리
+  const sortedGroupKeys = Object.keys(groupedOrders)
+    .map(Number)
+    .sort((a, b) => {
+      const dateA = new Date(groupedOrders[a][0].createdAt).getTime();
+      const dateB = new Date(groupedOrders[b][0].createdAt).getTime();
+      return dateB - dateA; // 내림차순 (최신순)
+    });
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-md p-0 sm:p-4" onClick={onClose}>
@@ -476,20 +486,22 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
 
             <div className="space-y-6">
               <p className="text-[10px] font-bold text-slate-500 flex items-center gap-2 uppercase tracking-widest"><Clock size={12} /> 주문 타임라인</p>
-              {Object.keys(groupedOrders).map((time) => {
-                const isWaitingDeposit = groupedOrders[time].some((o: Order) => o.orderStatus === "입금 확인 대기");
+              {sortedGroupKeys.map((orderId) => {
+                const groupOrders = groupedOrders[orderId];
+                const orderTime = groupOrders[0].time;
+                const isWaitingDeposit = groupOrders.some((o: Order) => o.orderStatus === "입금 확인 대기");
                 
                 return (
-                  <div key={time} className="bg-[#0f172a]/40 rounded-2xl p-4 border border-white/5 relative">
+                  <div key={orderId} className="bg-[#0f172a]/40 rounded-2xl p-4 border border-white/5 relative">
                     <div className="flex justify-between items-center mb-4 border-b border-white/5 pb-3">
-                      <div className="text-[13px] text-slate-500 font-mono">주문시간: {time}</div>
+                      <div className="text-[13px] text-slate-500 font-mono">주문시간: {orderTime} <span className="ml-2 text-[10px] text-slate-600">#{orderId}</span></div>
                       
                       {isWaitingDeposit && (
                         <div className="flex items-center gap-2">
-                          <button onClick={() => handleDeleteGroupClick(time)} className="bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/20 px-4 py-2 rounded-lg font-black text-xs flex items-center gap-2 transition-all active:scale-95">
+                          <button onClick={() => handleDeleteGroupClick(orderId)} className="bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/20 px-4 py-2 rounded-lg font-black text-xs flex items-center gap-2 transition-all active:scale-95">
                             <Trash2 size={14} /> 주문 취소
                           </button>
-                          <button onClick={() => confirmGroupDeposit(time)} className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg font-black text-xs flex items-center gap-2 transition-all shadow-lg shadow-emerald-900/20 active:scale-95">
+                          <button onClick={() => confirmGroupDeposit(orderId)} className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg font-black text-xs flex items-center gap-2 transition-all shadow-lg shadow-emerald-900/20 active:scale-95">
                             <CreditCard size={14} /> 입금 확인
                           </button>
                         </div>
@@ -497,7 +509,7 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
                     </div>
 
                     <div className="space-y-3">
-                      {groupedOrders[time].map((order: Order) => (
+                      {groupOrders.map((order: Order) => (
                         <div key={order.id} className="flex justify-between items-center bg-white/5 p-3 sm:p-4 rounded-xl border border-transparent">
                           <div className="flex flex-col">
                             <span className="text-base sm:text-xl font-bold text-slate-200">{order.name}</span>
@@ -509,6 +521,12 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
                               <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
                               입금 대기 중
                             </div>
+                          ) : order.itemStatus === "거절됨" ? (
+                            <button 
+                              disabled 
+                              className="px-4 py-2 sm:px-6 sm:py-3 rounded-xl font-black text-xs sm:text-sm bg-red-900/50 text-red-500 border border-red-500/20 cursor-not-allowed">
+                              거절됨
+                            </button>
                           ) : (
                             <button 
                               onClick={() => updateItemStatus(order.orderItemId, order.itemStatus)} 
@@ -528,7 +546,7 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
                       <div className="mt-4 pt-4 border-t border-dashed border-emerald-500/20 flex justify-between items-center bg-emerald-500/5 p-4 rounded-xl">
                         <span className="text-sm font-bold text-emerald-500/80">입금 확인 대기 총액</span>
                         <span className="text-xl font-black text-emerald-400">
-                          {groupedOrders[time]
+                          {groupOrders
                             .filter((o: Order) => o.orderStatus === "입금 확인 대기")
                             .reduce((sum: number, o: Order) => sum + (o.price * o.quantity), 0)
                             .toLocaleString()
@@ -645,10 +663,10 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
               <div className="p-10 space-y-8">
                 <h3 className="text-2xl font-black text-red-500 italic flex items-center gap-2 uppercase tracking-tighter"><Trash2 size={28} /> 주문 전체 취소</h3>
                 
-                {timeToDelete && (
+                {orderIdToDelete !== null && (
                   <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl">
-                    <p className="text-red-400 font-bold text-sm">주문 시간 : {timeToDelete}</p>
-                    <p className="text-red-500/60 text-xs mt-1">해당 시간에 접수된 주문 전체를 정말 삭제하시겠습니까?</p>
+                    <p className="text-red-400 font-bold text-sm">주문 번호 : #{orderIdToDelete}</p>
+                    <p className="text-red-500/60 text-xs mt-1">해당 주문 전체를 정말 삭제/취소하시겠습니까?</p>
                   </div>
                 )}
 
