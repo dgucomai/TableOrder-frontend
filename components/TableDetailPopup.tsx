@@ -319,7 +319,7 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
     if (orderIdToDelete === null) return; 
     
     try {
-      const response = await staffFetch(`/api/staff/orders/${orderIdToDelete}`, {
+      const response = await staffFetch(`/api/staff/orders/${orderIdToDelete}/reject`, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ reason: deleteReason }),
@@ -342,7 +342,7 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
 
     } catch (e) {
       console.error(e);
-      alert("주문 취소 실패: 서버와 통신 중 문제가 발생했습니다.");
+      alert("주문 거절 실패: 서버와 통신 중 문제가 발생했습니다.");
     }
   };
 
@@ -513,7 +513,7 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
                         {isWaitingDeposit && (
                           <>
                             <button onClick={() => handleDeleteGroupClick(orderId)} className="bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/20 px-4 py-2 rounded-lg font-black text-xs flex items-center gap-2 transition-all active:scale-95">
-                              <Trash2 size={14} /> 주문 취소
+                              <Trash2 size={14} /> 주문 거절
                             </button>
                             <button onClick={() => confirmGroupDeposit(orderId)} className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg font-black text-xs flex items-center gap-2 transition-all shadow-lg shadow-emerald-900/20 active:scale-95">
                               <CreditCard size={14} /> 입금 확인
@@ -676,18 +676,18 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
               className="fixed inset-0 md:relative md:inset-auto z-20 md:z-0 bg-slate-900/95 md:bg-slate-800 border-l border-white/10 md:rounded-r-[2rem] w-full md:w-[350px] flex flex-col justify-center shadow-2xl">
               <button onClick={() => setIsDeleteOrderOpen(false)} className="md:hidden absolute top-6 right-6 p-4 bg-white/10 rounded-full"><X size={32} /></button>
               <div className="p-10 space-y-8">
-                <h3 className="text-2xl font-black text-red-500 italic flex items-center gap-2 uppercase tracking-tighter"><Trash2 size={28} /> 주문 전체 취소</h3>
+                <h3 className="text-2xl font-black text-red-500 italic flex items-center gap-2 uppercase tracking-tighter"><Trash2 size={28} /> 주문 거절됨절</h3>
                 
                 {orderIdToDelete !== null && (
                   <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl">
                     <p className="text-red-400 font-bold text-sm">주문 번호 : #{orderIdToDelete}</p>
-                    <p className="text-red-500/60 text-xs mt-1">해당 주문 전체를 정말 삭제/취소하시겠습니까?</p>
+                    <p className="text-red-500/60 text-xs mt-1">해당 주문 전체를 정말 거절 하시겠습니까?</p>
                   </div>
                 )}
 
                 <div className="space-y-6">
                   <div>
-                    <label className="text-[12px] text-slate-500 font-bold block mb-2 uppercase tracking-widest">취소 사유</label>
+                    <label className="text-[12px] text-slate-500 font-bold block mb-2 uppercase tracking-widest">거절 사유</label>
                     <input type="text" placeholder="사유 입력 (필수)" value={deleteReason} onChange={(e) => setDeleteReason(e.target.value)} className="w-full bg-[#0f172a] border border-white/10 rounded-xl p-4 text-sm font-bold outline-none focus:ring-1 focus:ring-red-500 text-slate-200" />
                   </div>
                 </div>
