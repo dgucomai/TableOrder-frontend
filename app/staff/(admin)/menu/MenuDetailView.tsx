@@ -2,8 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { ArrowLeft, Clock, ImageOff } from "lucide-react";
-import { MenuItem, PreparingOrderItem } from "./types";
-import { formatClock } from "./utils";
+import { MenuItem } from "./types";
 import { staffFetch } from "@/lib/staffFetch";
 
 interface MenuDetailViewProps {
@@ -13,13 +12,26 @@ interface MenuDetailViewProps {
   onToggleSoldOut: () => void;
 }
 
+// API 응답 구조에 맞춘 내부 인터페이스
+interface PreparingOrderData {
+  orderItemId: number;
+  orderId: number;
+  tableId: number;
+  tableNumber: number;
+  menuId: number;
+  quantity: number;
+  unitPrice: number;
+  subtotal: number;
+  itemStatus: string;
+}
+
 export default function MenuDetailView({
   menu,
   isTogglingSoldOut,
   onBackClick,
   onToggleSoldOut,
 }: MenuDetailViewProps) {
-  const [preparingOrders, setPreparingOrders] = useState<PreparingOrderItem[]>([]);
+  const [preparingOrders, setPreparingOrders] = useState<PreparingOrderData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   // 단일 메뉴 상세 데이터 호출 (준비 중인 주문 데이터)
@@ -43,6 +55,39 @@ export default function MenuDetailView({
 
     fetchMenuDetail();
   }, [menu.menuId]);
+
+  // [API 연동] 개별 메뉴 상태 변경 (TableDetailPopup 기능 이식)
+  const updateItemStatus = async (orderItemId: number, currentItemStatus: string) => {
+    if (currentItemStatus === "입금 확인 대기" || currentItemStatus === "거절됨" || currentItemStatus === "취소됨") return;
+
+    // 메뉴 상세 뷰의 '준비중 주문' 리스트이므로, SERVED로 변경
+    const nextStatus = currentItemStatus === "PREPARING" ? "SERVED" : "PREPARING";
+
+    try {
+      const response = await staffFetch(`/api/staff/items/${orderItemId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: nextStatus }),
+      });
+      
+      if (response.ok) {
+        // 성공 시 리스트에서 즉각 제거 (제공 완료 상태가 되므로 준비중 리스트에서 제외)
+        if (nextStatus === "SERVED") {
+          setPreparingOrders(prev => prev.filter(order => order.orderItemId !== orderItemId));
+        } else {
+          setPreparingOrders(prev => prev.map(order => 
+            order.orderItemId === orderItemId 
+              ? { ...order, itemStatus: nextStatus } 
+              : order
+          ));
+        }
+      } else {
+        alert("상태 변경에 실패했습니다.");
+      }
+    } catch (e) {
+      alert("서버 통신 오류가 발생했습니다.");
+    }
+  };
 
   return (
     <div className="h-full min-h-[calc(100vh-4rem)] bg-[#020617] text-white overflow-y-auto">
@@ -90,7 +135,7 @@ export default function MenuDetailView({
               )}
 
               <div className="absolute bottom-3 right-3 px-4 py-1.5 rounded-full bg-slate-900/90 text-slate-200 text-sm font-black shadow-lg backdrop-blur border border-white/10 z-20">
-                {(menu.price ?? 0).toLocaleString()}원
+                {menu.price?.toLocaleString()}원
               </div>
             </div>
 
@@ -142,8 +187,8 @@ export default function MenuDetailView({
                 <div className="space-y-3">
                   {preparingOrders.map((order, index) => (
                     <div
-                      key={order.id}
-                      className="flex flex-col gap-3 rounded-2xl border border-orange-500/20 bg-orange-500/10 p-4 md:p-5"
+                      key={order.orderItemId}
+                      className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 rounded-2xl border border-orange-500/20 bg-orange-500/10 p-4 md:p-5"
                     >
                       <div className="flex items-center gap-4">
                         <div className="w-10 h-10 rounded-2xl bg-orange-500 text-white flex items-center justify-center font-black shrink-0">
@@ -151,22 +196,31 @@ export default function MenuDetailView({
                         </div>
                         <div className="min-w-0">
                           <p className="text-2xl font-black text-white">
-                            {order.tableId}번 테이블
+                            {order.tableNumber !== undefined ? `${order.tableNumber}번 테이블` : `테이블 ID: ${order.tableId}`}
                           </p>
                           <p className="text-sm text-orange-200/70 font-bold truncate">
-                            주문번호 {order.orderId}
+                            주문번호 #{order.orderId}
                           </p>
                         </div>
                       </div>
 
-                      <div className="rounded-xl bg-slate-950/30 px-4 py-3 text-sm md:text-base font-black text-white whitespace-nowrap overflow-x-auto">
-                        <span className="text-slate-400">주문시간</span>
-                        <span className="mx-2 text-slate-600">|</span>
-                        <span>{formatClock(order.orderedAt, order.time)}</span>
-                        <span className="mx-3 text-slate-600">|</span>
-                        <span className="text-slate-400">수량</span>
-                        <span className="mx-2 text-slate-600">|</span>
-                        <span>{order.quantity}개</span>
+                      <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-end">
+                        <div className="rounded-xl bg-slate-950/30 px-4 py-3 text-sm md:text-base font-black text-white whitespace-nowrap overflow-x-auto">
+                          <span className="text-slate-400">수량</span>
+                          <span className="mx-2 text-slate-600">|</span>
+                          <span>{order.quantity}개</span>
+                        </div>
+
+                        {/* 상태 변경 버튼 */}
+                        <button 
+                          onClick={() => updateItemStatus(order.orderItemId, order.itemStatus)} 
+                          className={`px-4 py-3 sm:px-6 rounded-xl font-black text-xs sm:text-sm transition-all whitespace-nowrap ${
+                            order.itemStatus === "SERVED" 
+                            ? "bg-slate-700 text-slate-400 hover:bg-slate-600 active:scale-95 shadow-inner" 
+                            : "bg-orange-500 text-white hover:bg-orange-400 active:scale-95 shadow-lg shadow-orange-900/20"
+                          }`}>
+                          {order.itemStatus === "PREPARING" ? "준비 중" : "제공 완료"}
+                        </button>
                       </div>
                     </div>
                   ))}
