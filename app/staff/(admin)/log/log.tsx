@@ -37,34 +37,42 @@ const fetchLogs = async (cursor?: number): Promise<LogApiResponse> => {
 };
 
 export default function StaffLogPage() {
-  // 무한 스크롤 감지를 위한 옵저버 훅 (스크롤 맨 아래 도달 시 inView가 true가 됨)
-  const { ref, inView } = useInView();
-
   // TanStack Query: 커서 기반 무한 스크롤 훅 적용
+  const { ref, inView } = useInView({
+    // 옵션: 요소가 화면에 나타나자마자가 아니라 10% 정도 보였을 때 호출 (중복 호출 방지에 도움)
+    threshold: 0.1, 
+  });
+
   const {
     data,
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
+    isFetching, // 👈 추가: 전체 로딩 상태 가져오기
     refetch,
-    isFetching,
     status
   } = useInfiniteQuery({
-    queryKey: ["adminLogs"], 
+    queryKey: ["adminLogs"],
     queryFn: ({ pageParam }) => fetchLogs(pageParam as number | undefined),
     initialPageParam: undefined as number | undefined,
     getNextPageParam: (lastPage) => {
-      // hasNext가 true일 때만 nextCursor를 다음 페이지 파라미터로 넘김
       return lastPage.cursor.hasNext ? lastPage.cursor.nextCursor : undefined;
     },
+    // ✅ 1. 다른 탭이나 창을 다녀왔을 때 백그라운드 전체 재호출 방지
+    refetchOnWindowFocus: false, 
+    
+    // ✅ 2. 다른 페이지로 이동 시 캐시를 즉시 삭제하여, 다시 들어오면 무조건 처음 10개만 로드하게 설정
+    // (참고: TanStack Query v4 이하를 사용 중이라면 gcTime 대신 cacheTime: 0 을 사용하세요)
+    gcTime: 0, 
   });
 
-  // 스크롤이 맨 아래(ref)에 닿았고, 다음 페이지가 존재하며, 현재 로딩 중이 아닐 때 다음 데이터 호출
+  // ✅ 3. 중복 호출 완벽 차단 로직
   useEffect(() => {
-    if (inView && hasNextPage && !isFetchingNextPage) {
+    // 다음 페이지가 있고, 화면에 트리거가 보이며, "아무런 로딩도 진행 중이 아닐 때만" 호출
+    if (inView && hasNextPage && !isFetching && !isFetchingNextPage) {
       fetchNextPage();
     }
-  }, [inView, hasNextPage, isFetchingNextPage, fetchNextPage]);
+  }, [inView, hasNextPage, isFetching, isFetchingNextPage, fetchNextPage]);
 
   // pages 배열(2차원)을 하나의 배열(1차원)로 평탄화(flatMap)하여 통합
   const logs = useMemo(() => {
