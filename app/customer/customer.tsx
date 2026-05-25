@@ -12,7 +12,8 @@ interface MenuItem {
   menuName: string;
   price: number;
   description: string;
-  imageUrl: string | null;
+  imageUrl360: string | null;
+  imageUrl1024: string | null;
   soldOut: boolean;
 }
 
@@ -491,8 +492,8 @@ export default function OrderPage() {
                                 
                                 {/* 음식 이미지 영역을 relative로 설정 */}
                                 <div className="relative w-24 h-24 shrink-0">
-                                  {item.imageUrl ? (
-                                    <img src={item.imageUrl} alt={item.menuName} className="w-full h-full rounded-xl object-cover bg-gray-100 border border-black/5" />
+                                  {item.imageUrl360 ? (
+                                    <img src={item.imageUrl360} alt={item.menuName} className="w-full h-full rounded-xl object-cover bg-gray-100 border border-black/5" />
                                   ) : (
                                     <div className="w-full h-full rounded-xl bg-gray-200 flex items-center justify-center text-xs text-gray-400 whitespace-nowrap">No Image</div>
                                   )}
@@ -548,8 +549,8 @@ export default function OrderPage() {
           </button>
 
           <div className="flex-1 overflow-y-auto pb-32">
-            {selectedMenu.imageUrl ? (
-              <img src={selectedMenu.imageUrl} alt={selectedMenu.menuName} className="w-full aspect-[4/3] object-cover bg-gray-100" />
+            {selectedMenu.imageUrl1024 ? (
+              <img src={selectedMenu.imageUrl1024} alt={selectedMenu.menuName} className="w-full aspect-[4/3] object-cover bg-gray-100" />
             ) : (
               <div className="w-full aspect-[4/3] bg-gray-200 flex items-center justify-center text-gray-400">이미지 준비중</div>
             )}
