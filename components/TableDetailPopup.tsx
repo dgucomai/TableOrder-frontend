@@ -490,11 +490,20 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
                 const groupOrders = groupedOrders[orderId];
                 const orderTime = groupOrders[0].time;
                 const isWaitingDeposit = groupOrders.some((o: Order) => o.orderStatus === "입금 확인 대기");
+                const isRejected = groupOrders.some((o: Order) => o.orderStatus === "거절됨");
                 
                 return (
                   <div key={orderId} className="bg-[#0f172a]/40 rounded-2xl p-4 border border-white/5 relative">
                     <div className="flex justify-between items-center mb-4 border-b border-white/5 pb-3">
-                      <div className="text-[13px] text-slate-500 font-mono">주문시간: {orderTime} <span className="ml-2 text-[10px] text-slate-600">#{orderId}</span></div>
+                      <div className="text-[13px] text-slate-500 font-mono flex items-center gap-2">
+                        <span>주문시간: {orderTime}</span>
+                        <span className="text-[10px] text-slate-600">#{orderId}</span>
+                        {isRejected && (
+                          <span className="bg-red-500/10 text-red-500 border border-red-500/20 px-2 py-0.5 rounded-md text-[10px] font-bold">
+                            승인 거절
+                          </span>
+                        )}
+                      </div>
                       
                       {isWaitingDeposit && (
                         <div className="flex items-center gap-2">
