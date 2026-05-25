@@ -16,9 +16,7 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
   const navLinks = [
     { href: "/staff/home", label: "홈" },
     { href: "/staff/menu", label: "메뉴" },
-    //{ href: "/staff/calls", label: "호출" },
     { href: "/staff/log", label: "기록" },
-    { href: "/staff/qr", label: "QR 생성기" },
     { href: "/staff/sales", label: "매출 현황" },
   ];
 
