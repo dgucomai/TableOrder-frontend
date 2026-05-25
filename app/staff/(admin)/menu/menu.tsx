@@ -14,87 +14,97 @@ export default function StaffMenuPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isTogglingSoldOut, setIsTogglingSoldOut] = useState(false);
 
-  // 메뉴 리스트 API 호출 및 안정적인 데이터 병합
   useEffect(() => {
     const fetchMenus = async () => {
-      let originMenus = [];
+      setIsLoading(true);
+      
+      // 타입 추론 에러 방지를 위한 any[] 선언
+      let originMenus: any[] = [];
       let staffData: any[] = [];
 
+      // [1] 일반 메뉴 API (독립 실행)
       try {
-        setIsLoading(true);
-        console.log("[스태프 메뉴] 데이터 로딩 시작");
-
-        // 1. 일반 메뉴 API 호출
-        console.log("[스태프 메뉴] 1단계: /api/menus 호출 시도...");
         const menuRes = await fetch("/api/menus");
+        if (!menuRes.ok) throw new Error(`상태 코드: ${menuRes.status}`);
         const menuResult = await menuRes.json();
-        console.log("[스태프 메뉴] 1단계 성공 응답:", menuResult);
         
         if (menuResult.success && menuResult.data?.menus) {
           originMenus = menuResult.data.menus;
         }
-
-        // 2. 스태프 현황 메뉴 API 호출 (개별 try-catch로 감싸서 예외 격리)
-        console.log("[스태프 메뉴] 2단계: /api/staff/menus 호출 시도...");
-        try {
-          const staffRes = await staffFetch("/api/staff/menus");
-          const staffResult = await staffRes.json();
-          console.log("[스태프 메뉴] 2단계 성공 응답:", staffResult);
-
-          if (staffResult.success && staffResult.data) {
-            staffData = staffResult.data;
-          }
-        } catch (staffError) {
-          // staffFetch 내부(JWT 검증, 로컬스토리지 접근 등)에서 터지면 이곳에 잡힙니다.
-          console.error("[스태프 메뉴] 2단계(staffFetch) 자체에서 에러 발생:", staffError);
-          alert("스태프 전용 API 호출 중 실패했습니다. 콘솔 창을 확인하세요.");
-        }
-
-        // 3. 두 데이터 병합 프로세스 수행
-        console.log("[스태프 메뉴] 3단계: 데이터 병합 프로세스 시작");
-        if (originMenus.length > 0) {
-          const mergedMenus: MenuItem[] = originMenus.map((originItem: any) => {
-            const staffItem = staffData.find(
-              (s: any) => s.menuItemId === originItem.menuId
-            );
-
-            return {
-              menuId: originItem.menuId,
-              categoryId: originItem.categoryId,
-              categoryName: originItem.categoryName,
-              menuName: originItem.menuName,
-              price: originItem.price,
-              description: originItem.description,
-              imageUrl: originItem.imageUrl,
-              isSoldOut: originItem.isSoldOut,
-              // staff/menus 패킷이 실패해 데이터가 없더라도 화면이 깨지지 않게 0으로 방어 처리
-              countPreparing: staffItem ? staffItem.countPreparing : 0,
-              countServed: staffItem ? staffItem.countServed : 0,
-              subtotal: staffItem ? staffItem.subtotal : 0,
-            };
-          });
-
-          console.log("[스태프 메뉴] 최종 병합 완료 데이터:", mergedMenus);
-          setMenus(mergedMenus);
-
-          // 카테고리 추출
-          const uniqueCategories = Array.from(
-            new Set(mergedMenus.map((m: MenuItem) => m.categoryName))
-          ) as string[];
-          setCategories(["All", ...uniqueCategories]);
-        }
-
       } catch (error) {
-        console.error("[스태프 메뉴] 전체 흐름 중 치명적 오류 발생:", error);
-      } finally {
-        setIsLoading(false);
+        console.error("❌ /api/menus 기본 메뉴 호출 실패 (이곳이 문제였을 수 있습니다):", error);
       }
+
+      // [2] 스태프 현황 API (1번 성공 여부와 무조건 무관하게 독립 실행!)
+      try {
+        const staffRes = await staffFetch("/api/staff/menus");
+        if (!staffRes.ok) throw new Error(`상태 코드: ${staffRes.status}`);
+        const staffResult = await staffRes.json();
+        
+        if (staffResult.success && staffResult.data) {
+          staffData = staffResult.data;
+        }
+      } catch (error) {
+        console.error("❌ /api/staff/menus 스태프 현황 호출 실패:", error);
+      }
+
+      // [3] 안전한 병합 로직
+      let mergedMenus: MenuItem[] = [];
+
+      if (originMenus.length > 0) {
+        // 기본 메뉴를 바탕으로 스태프 데이터를 끼워넣음
+        mergedMenus = originMenus.map((originItem: any) => {
+          // 간혹 string과 number 타입이 달라 매칭이 안되는 경우를 방어하기 위해 Number() 강제 형변환
+          const staffItem = staffData.find(
+            (s: any) => Number(s.menuItemId) === Number(originItem.menuId)
+          );
+
+          return {
+            menuId: originItem.menuId,
+            categoryId: originItem.categoryId || 0,
+            categoryName: originItem.categoryName || "기본",
+            menuName: originItem.menuName || "이름 없음",
+            price: originItem.price || 0,
+            description: originItem.description || "",
+            imageUrl: originItem.imageUrl || null,
+            isSoldOut: originItem.isSoldOut || false,
+            countPreparing: staffItem ? staffItem.countPreparing : 0,
+            countServed: staffItem ? staffItem.countServed : 0,
+            subtotal: staffItem ? staffItem.subtotal : 0,
+          };
+        });
+      } else if (staffData.length > 0) {
+        // 만약 기본 메뉴 API가 터졌는데 스태프 API만 성공한 경우, 화면이 텅 비는 것을 막기 위한 예외 처리
+        mergedMenus = staffData.map((staffItem: any) => ({
+            menuId: staffItem.menuItemId,
+            categoryId: 0,
+            categoryName: "기본",
+            menuName: staffItem.name || "이름 없음",
+            price: 0,
+            description: "",
+            imageUrl: null,
+            isSoldOut: false,
+            countPreparing: staffItem.countPreparing || 0,
+            countServed: staffItem.countServed || 0,
+            subtotal: staffItem.subtotal || 0,
+        }));
+      }
+
+      // 상태 업데이트
+      setMenus(mergedMenus);
+      
+      const uniqueCategories = Array.from(
+        new Set(mergedMenus.map((m: MenuItem) => m.categoryName))
+      ) as string[];
+      setCategories(["All", ...uniqueCategories]);
+      
+      setIsLoading(false);
     };
 
     fetchMenus();
   }, []);
 
-  // 브라우저 뒤로가기(History API) 처리용 useEffect
+  // 뒤로가기 제어용
   useEffect(() => {
     const handlePopState = (event: PopStateEvent) => {
       if (event.state && event.state.menuId) {
@@ -109,7 +119,6 @@ export default function StaffMenuPage() {
     return () => window.removeEventListener("popstate", handlePopState);
   }, [menus]);
 
-  // 상세 메뉴 클릭 처리
   const handleMenuClick = (menu: MenuItem) => {
     setSelectedMenu(menu);
     window.history.pushState(
@@ -119,7 +128,6 @@ export default function StaffMenuPage() {
     );
   };
 
-  // 상세 메뉴 내 뒤로가기 버튼 클릭 처리
   const handleBackClick = () => {
     if (window.history.state?.menuId) {
       window.history.back();
@@ -128,7 +136,6 @@ export default function StaffMenuPage() {
     }
   };
 
-  // 품절 상태 변경 API 호출 로직
   const toggleSoldOutStatus = async () => {
     if (!selectedMenu) return;
 
