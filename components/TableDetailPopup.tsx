@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { staffFetch } from "@/lib/staffFetch";
 import { useSseEvent } from "@/lib/SseContext";
-import { X, Coins, Clock, Check, AlertTriangle, Timer, CreditCard, RotateCcw, Trash2, MessageSquare } from "lucide-react";
+import { X, Coins, Clock, Check, AlertTriangle, Timer, CreditCard, RotateCcw, Trash2, MessageSquare, Receipt } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 interface Order {
@@ -496,7 +496,9 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
               {/* 화면이 좁을 때 정보를 깔끔하게 가로로 밀어서 볼 수 있게 처리 */}
               <div className="flex items-center gap-4 sm:gap-8 sm:border-l border-white/10 sm:pl-10 w-full overflow-x-auto whitespace-nowrap pb-1 sm:pb-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
                 <div className="flex flex-col">
-                  <span className="text-[10px] sm:text-[12px] text-slate-500 font-bold uppercase tracking-widest">총 금액</span>
+                  <span className="text-[10px] sm:text-[12px] text-slate-500 font-bold uppercase tracking-widest flex items-center gap-1">
+                    <Receipt size={10} /> 총 금액
+                  </span>
                   <span className="text-base sm:text-3xl font-black text-white">{totalAmount.toLocaleString()}원</span>
                 </div>
                 <div className="flex flex-col border-l border-white/5 pl-4 sm:pl-8">
@@ -709,7 +711,7 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
                     <label className="text-[12px] text-slate-500 font-bold block mb-2 uppercase tracking-widest">증감할 수량</label>
                     <input 
                       type="number" 
-                      placeholder="증감할 수량을 입력하세요." 
+                      placeholder="증감할 수량 입력" 
                       value={tokenDelta} 
                       onChange={(e) => setTokenDelta(e.target.value)} 
                       className="w-full bg-[#0f172a] border border-white/10 rounded-xl p-4 text-2xl font-black text-center outline-none focus:ring-1 focus:ring-yellow-500 text-yellow-500" 

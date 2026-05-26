@@ -258,7 +258,6 @@ export default function OrderPage() {
         <>
           <div className="sticky top-0 z-30 flex flex-col bg-white">
             <header className="px-4 pt-3 pb-2 flex justify-between items-center">
-              {/* 🌟 수정된 왼쪽 영역: 뒤로가기 버튼 + 타이틀 그룹 */}
               <div className="flex items-center gap-1 min-w-0 flex-1">
                 <button 
                   onClick={() => router.replace(`/?qt=${qrToken || ""}`)}
@@ -281,7 +280,6 @@ export default function OrderPage() {
                 </div>
               </div>
 
-              {/* 오른쪽 영역 (그대로 유지) */}
               <div className="flex items-center gap-1 shrink-0">
                 <button onClick={() => setIsCallModalOpen(true)} className="p-2 text-orange-600 hover:bg-orange-50 rounded-full transition-colors flex flex-col items-center justify-center whitespace-nowrap shrink-0">
                   <BellRing className="w-6 h-6 shrink-0" />
@@ -364,27 +362,31 @@ export default function OrderPage() {
                                   </div>
                                 </div>
                                 
-                                {/* 🌟 Next/Image 컴포넌트 적용 구역 */}
-                                <div className="relative w-24 h-24 shrink-0 rounded-xl overflow-hidden bg-gray-100 border border-black/5">
-                                  {item.imageUrl360 ? (
-                                    <Image 
-                                      src={item.imageUrl360} 
-                                      alt={item.menuName} 
-                                      fill
-                                      sizes="96px"
-                                      priority={isPriorityImage}
-                                      className="object-cover" 
-                                    />
-                                  ) : (
-                                    <div className="w-full h-full flex items-center justify-center text-xs text-gray-400 whitespace-nowrap">No Image</div>
-                                  )}
-                                  
-                                  {item.soldOut && (
-                                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center backdrop-blur-[1px]">
-                                      <span className="bg-red-600 text-white text-xs font-black px-2.5 py-1 rounded shadow-sm tracking-widest">품절</span>
-                                    </div>
-                                  )}
+                                {/* 🌟 수정된 구역: 버튼이 잘리지 않도록 overflow-hidden 분리 */}
+                                <div className="relative w-24 h-24 shrink-0">
+                                  {/* 이미지만 감싸서 깎아주는 영역 */}
+                                  <div className="w-full h-full rounded-xl overflow-hidden bg-gray-100 border border-black/5 relative">
+                                    {item.imageUrl360 ? (
+                                      <Image 
+                                        src={item.imageUrl360} 
+                                        alt={item.menuName} 
+                                        fill
+                                        sizes="96px"
+                                        priority={isPriorityImage}
+                                        className="object-cover" 
+                                      />
+                                    ) : (
+                                      <div className="w-full h-full flex items-center justify-center text-xs text-gray-400 whitespace-nowrap">No Image</div>
+                                    )}
+                                    
+                                    {item.soldOut && (
+                                      <div className="absolute inset-0 bg-black/40 flex items-center justify-center backdrop-blur-[1px]">
+                                        <span className="bg-red-600 text-white text-xs font-black px-2.5 py-1 rounded shadow-sm tracking-widest">품절</span>
+                                      </div>
+                                    )}
+                                  </div>
 
+                                  {/* 깎이는 영역 바깥으로 빼낸 추가 버튼 */}
                                   {!cartItem && !item.soldOut && (
                                     <button 
                                       onClick={(e) => { e.stopPropagation(); addToCart(item, 1); }}
@@ -394,6 +396,8 @@ export default function OrderPage() {
                                     </button>
                                   )}
                                 </div>
+                                {/* 🌟 수정 구역 끝 */}
+                                
                               </div>
                             );
                           })}
