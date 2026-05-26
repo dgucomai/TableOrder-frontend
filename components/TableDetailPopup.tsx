@@ -846,4 +846,4 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
       </div>
     </motion.div>
   );
-}ㄹ
+}
