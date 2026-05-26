@@ -70,7 +70,7 @@ export default function MenuDetailModal({ selectedMenu, closeMenuDetail, addToCa
               >
                 <Minus size={16} />
               </button>
-              <span className="text-lg font-bold w-6 text-center">{detailQuantity}</span>
+              <span className="text-lg text-black font-bold w-6 text-center">{detailQuantity}</span>
               <button 
                 onClick={() => setDetailQuantity(Math.min(9, detailQuantity + 1))}
                 className="w-8 h-8 flex items-center justify-center text-gray-900 bg-gray-100 rounded-full hover:bg-gray-200 disabled:opacity-30"

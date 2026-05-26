@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useRef } from 'react';
-import { Plus, Minus, X, ChevronRight, ChevronLeft, ReceiptText, Bell, BellRing } from 'lucide-react';
+import { Plus, Minus, X, ChevronRight, ArrowLeft, ReceiptText, Bell, BellRing } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import dynamic from 'next/dynamic';
@@ -259,12 +259,13 @@ export default function OrderPage() {
           <div className="sticky top-0 z-30 flex flex-col bg-white">
             <header className="px-4 pt-3 pb-2 flex justify-between items-center">
               <div className="flex items-center gap-1 min-w-0 flex-1">
+                {/* 🌟 수정된 뒤로가기 버튼: ArrowLeft 적용 및 스타일 개선 */}
                 <button 
                   onClick={() => router.replace(`/?qt=${qrToken || ""}`)}
-                  className="p-1.5 -ml-1.5 text-gray-600 hover:bg-gray-100 rounded-full transition-colors shrink-0"
+                  className="p-2 -ml-2 text-gray-800 hover:bg-gray-100 active:bg-gray-200 rounded-full transition-colors shrink-0 flex items-center justify-center"
                   aria-label="메인 페이지로 뒤로가기"
                 >
-                  <ChevronLeft className="w-6 h-6 shrink-0" />
+                  <ArrowLeft className="w-6 h-6 shrink-0" strokeWidth={2.5} />
                 </button>
                 
                 <div className="min-w-0 flex-1 mr-2 pl-1">
@@ -362,9 +363,7 @@ export default function OrderPage() {
                                   </div>
                                 </div>
                                 
-                                {/* 🌟 수정된 구역: 버튼이 잘리지 않도록 overflow-hidden 분리 */}
                                 <div className="relative w-24 h-24 shrink-0">
-                                  {/* 이미지만 감싸서 깎아주는 영역 */}
                                   <div className="w-full h-full rounded-xl overflow-hidden bg-gray-100 border border-black/5 relative">
                                     {item.imageUrl360 ? (
                                       <Image 
@@ -386,7 +385,6 @@ export default function OrderPage() {
                                     )}
                                   </div>
 
-                                  {/* 깎이는 영역 바깥으로 빼낸 추가 버튼 */}
                                   {!cartItem && !item.soldOut && (
                                     <button 
                                       onClick={(e) => { e.stopPropagation(); addToCart(item, 1); }}
@@ -396,7 +394,6 @@ export default function OrderPage() {
                                     </button>
                                   )}
                                 </div>
-                                {/* 🌟 수정 구역 끝 */}
                                 
                               </div>
                             );
