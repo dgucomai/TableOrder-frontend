@@ -98,7 +98,7 @@ function CaisinoHome() {
           CAISINO
         </h1>
         <p className="text-sm sm:text-base text-slate-400 font-medium tracking-widest uppercase">
-          Welcome to the game
+          카이지노에 오신 것을 환영합니다.
         </p>
       </div>
 
