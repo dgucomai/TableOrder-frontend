@@ -789,7 +789,7 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
               className="fixed inset-0 md:relative md:inset-auto z-20 md:z-0 bg-slate-900/95 md:bg-slate-800 border-l border-white/10 md:rounded-r-[2rem] w-full md:w-[350px] flex flex-col justify-center shadow-2xl">
               <button onClick={() => setIsDeleteOrderOpen(false)} className="md:hidden absolute top-6 right-6 p-4 bg-white/10 rounded-full"><X size={32} /></button>
               <div className="p-10 space-y-8">
-                <h3 className="text-2xl font-black text-red-500 italic flex items-center gap-2 uppercase tracking-tighter"><Trash2 size={28} /> 거절</h3>
+                <h3 className="text-2xl font-black text-red-500 italic flex items-center gap-2 uppercase tracking-tighter"><Trash2 size={28} /> 승인 거절</h3>
                 
                 {orderIdToDelete !== null && (
                   <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl">
