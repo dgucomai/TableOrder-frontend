@@ -485,31 +485,37 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
       <div className={`flex flex-col md:flex-row transition-all duration-500 w-full h-full sm:h-[90vh] max-w-[1400px] ${(isEditTokenOpen || isResetOpen || isDeleteOrderOpen || isCancelOrderOpen) ? "md:-translate-x-[5vw]" : ""}`} onClick={(e) => e.stopPropagation()}>
         
         <motion.div className="relative flex-1 bg-[#1e293b] sm:rounded-[2rem] shadow-2xl border border-white/10 flex flex-col overflow-hidden z-10">
-          <div className="px-6 py-4 sm:px-10 sm:py-6 border-b border-white/5 flex justify-between items-center bg-slate-800/40">
-            <div className="flex items-center gap-4 sm:gap-12">
-              <h2 className="text-4xl sm:text-6xl font-black text-orange-500 italic tracking-tighter">
+          {/* =======================================================
+              모바일 레이아웃(잘림/줄바꿈 현상) 개선 적용된 헤더 영역
+              ======================================================= */}
+          <div className="px-5 py-4 sm:px-10 sm:py-6 border-b border-white/5 flex justify-between items-start sm:items-center bg-slate-800/40 gap-2">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-12 w-full overflow-hidden">
+              <h2 className="text-4xl sm:text-6xl font-black text-orange-500 italic tracking-tighter shrink-0">
                 {tableNumber !== null ? tableNumber : tableId}
               </h2>
-              <div className="flex items-center gap-4 sm:gap-8 border-l border-white/10 pl-4 sm:pl-10">
+              {/* 화면이 좁을 때 정보를 깔끔하게 가로로 밀어서 볼 수 있게 처리 */}
+              <div className="flex items-center gap-4 sm:gap-8 sm:border-l border-white/10 sm:pl-10 w-full overflow-x-auto whitespace-nowrap pb-1 sm:pb-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
                 <div className="flex flex-col">
                   <span className="text-[10px] sm:text-[12px] text-slate-500 font-bold uppercase tracking-widest">총 금액</span>
-                  <span className="text-lg sm:text-3xl font-black text-white">{totalAmount.toLocaleString()}원</span>
+                  <span className="text-base sm:text-3xl font-black text-white">{totalAmount.toLocaleString()}원</span>
                 </div>
                 <div className="flex flex-col border-l border-white/5 pl-4 sm:pl-8">
                   <span className="text-[10px] sm:text-[12px] text-yellow-500/80 font-bold uppercase tracking-widest flex items-center gap-1">
                     <Coins size={10} /> 보유 토큰
                   </span>
-                  <span className="text-lg sm:text-3xl font-black text-yellow-500">{tokens} T</span>
+                  <span className="text-base sm:text-3xl font-black text-yellow-500">{tokens} T</span>
                 </div>
                 <div className="flex flex-col border-l border-white/5 pl-4 sm:pl-8">
                   <span className="text-[10px] sm:text-[12px] text-cyan-600 font-bold uppercase tracking-widest flex items-center gap-1">
                     <Timer size={10} /> 이용 시간
                   </span>
-                  <span className="text-lg sm:text-3xl font-black text-cyan-500">{usageTime}</span>
+                  <span className="text-base sm:text-3xl font-black text-cyan-500">{usageTime}</span>
                 </div>
               </div>
             </div>
-            <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-xl transition-all"><X size={28} className="text-slate-500" /></button>
+            <button onClick={onClose} className="p-1 sm:p-2 hover:bg-white/10 rounded-xl transition-all shrink-0">
+              <X className="w-7 h-7 sm:w-8 sm:h-8 text-slate-500" />
+            </button>
           </div>
 
           <div className="flex-1 overflow-y-auto p-6 sm:p-10 space-y-6 sm:space-y-8 custom-scrollbar">
@@ -716,11 +722,16 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
                       <button onClick={() => adjustToken(10)} className="flex-1 bg-white/5 hover:bg-white/10 py-2 rounded-lg font-bold text-slate-400 transition-colors">+10</button>
                     </div>
 
-                    {tokenDelta && !isNaN(Number(tokenDelta)) && (
-                      <p className="mt-6 text-center text-sm font-bold text-slate-400">
-                        수정 후 예상 토큰: <span className="text-white">{tokens + Number(tokenDelta)} T</span>
+                    {/* =======================================================
+                        토큰 수정 시 UI 위아래로 흔들리는(Layout Shift) 현상 개선
+                        ======================================================= */}
+                    <div className="h-6 mt-5 flex items-center justify-center">
+                      <p className={`text-center text-sm font-bold text-slate-400 transition-opacity duration-200 ${
+                        tokenDelta && !isNaN(Number(tokenDelta)) ? "opacity-100" : "opacity-0"
+                      }`}>
+                        수정 후 예상 토큰: <span className="text-white">{tokens + (Number(tokenDelta) || 0)} T</span>
                       </p>
-                    )}
+                    </div>
                   </div>
                 </div>
                 <button 
