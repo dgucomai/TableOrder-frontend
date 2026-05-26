@@ -1,9 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { X, Beer, Gamepad2, AlertCircle, ChevronRight } from "lucide-react";
+
+// 로고 이미지 불러오기 (코드와 같은 위치)
+import logoImage from "./CAISINO.png";
 
 function CaisinoHome() {
   const searchParams = useSearchParams();
@@ -79,8 +83,16 @@ function CaisinoHome() {
       <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-[150%] h-64 bg-purple-600/10 blur-[100px] pointer-events-none"></div>
 
       <div className="text-center mb-12 sm:mb-16 z-10">
-        <div className="inline-flex items-center justify-center w-24 h-24 mb-6 bg-gradient-to-br from-slate-800 to-slate-900 rounded-3xl shadow-[0_0_40px_rgba(249,115,22,0.2)] border border-slate-700/50">
-          <span className="text-5xl drop-shadow-lg">🎰</span>
+        {/* 이미지 로고 영역 */}
+        <div className="inline-flex items-center justify-center mb-6 drop-shadow-[0_0_40px_rgba(249,115,22,0.3)]">
+          <Image
+            src={logoImage}
+            alt="CAISINO Logo"
+            width={110}
+            height={110}
+            className="object-contain"
+            priority // 초기 화면에서 렌더링되므로 우선순위 부여
+          />
         </div>
         <h1 className="text-4xl sm:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-orange-400 via-amber-300 to-yellow-500 tracking-tighter mb-2">
           CAISINO
