@@ -581,24 +581,35 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
                 const canCancel = ["입금 확인 대기", "준비 중", "제공 완료"].includes(orderStatus);
                 
                 return (
-                  <div key={orderId} className="bg-[#0f172a]/40 rounded-2xl p-4 border border-white/5 relative">
-                    <div className="flex flex-col sm:flex-row justify-between sm:items-center mb-4 border-b border-white/5 pb-3 gap-3">
-                      
-                      {/* 1. 왼쪽: 주문 취소 버튼 + 주문 기본 정보 */}
+                  <div key={orderId} className="bg-[#0f172a]/40 rounded-2xl p-4 sm:p-5 border border-white/5 relative">
+                    
+                    {/* 우측 상단으로 따로 뺀 입금 대기 액션 버튼 영역 */}
+                    {isWaitingDeposit && (
+                      <div className="absolute top-3 right-3 sm:top-5 sm:right-5 flex items-center gap-2 z-10">
+                        <button onClick={() => handleDeleteGroupClick(orderId)} className="bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/20 px-3 py-1.5 rounded-lg font-bold text-xs flex items-center gap-1.5 transition-all active:scale-95">
+                          <Trash2 size={14} /> 거절
+                        </button>
+                        <button onClick={() => confirmGroupDeposit(orderId)} className="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-lg font-bold text-xs flex items-center gap-1.5 transition-all shadow-lg shadow-emerald-900/20 active:scale-95">
+                          <CreditCard size={14} /> 입금 확인
+                        </button>
+                      </div>
+                    )}
+
+                    {/* 기존 헤더 영역: 액션 버튼과 겹치지 않도록 조건부 pt/pr 적용 */}
+                    <div className={`flex flex-wrap items-center mb-4 border-b border-white/5 pb-3 gap-3 ${isWaitingDeposit ? 'pt-10 sm:pt-0 sm:pr-48' : ''}`}>
                       <div className="flex items-center gap-3 w-full sm:w-auto">
                         {canCancel && (
                           <button 
                             onClick={() => handleCancelGroupClick(orderId)}
                             className="bg-slate-700/50 hover:bg-red-500/20 text-slate-400 hover:text-red-400 border border-slate-600 hover:border-red-500/30 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all active:scale-95"
                           >
-                            <X size={14} strokeWidth={2.5} /> 주문 취소
+                            <X size={14} strokeWidth={2.5} /> 취소
                           </button>
                         )}
                         
-                        <span className="text-sm font-medium text-slate-400">#{orderId}</span>
+                        <span className="text-s font-small text-slate-400">#{orderId}</span>
                         <span className="text-[13px] text-slate-500 font-medium">{orderTime}</span>
                         
-                        {/* 상태 뱃지 */}
                         <div className="flex items-center gap-2 ml-auto sm:ml-0">
                           {isRejected && (
                             <span className="bg-red-500/10 text-red-500 border border-red-500/20 px-2 py-1 rounded-md text-[10px] font-bold">
@@ -611,20 +622,6 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
                             </span>
                           )}
                         </div>
-                      </div>
-                      
-                      {/* 2. 오른쪽 액션 버튼 그룹 (거절, 입금 확인 등) */}
-                      <div className="flex flex-wrap items-center justify-end gap-2 w-full sm:w-auto">
-                        {isWaitingDeposit && (
-                          <>
-                            <button onClick={() => handleDeleteGroupClick(orderId)} className="bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/20 px-3 py-1.5 rounded-lg font-bold text-xs flex items-center gap-1.5 transition-all active:scale-95">
-                              <Trash2 size={14} /> 주문 거절
-                            </button>
-                            <button onClick={() => confirmGroupDeposit(orderId)} className="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-lg font-bold text-xs flex items-center gap-1.5 transition-all shadow-lg shadow-emerald-900/20 active:scale-95">
-                              <CreditCard size={14} /> 입금 확인
-                            </button>
-                          </>
-                        )}
                       </div>
                     </div>
 
@@ -849,4 +846,4 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
       </div>
     </motion.div>
   );
-}
+}ㄹ
