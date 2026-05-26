@@ -90,7 +90,8 @@ function CaisinoHome() {
             alt="CAISINO Logo"
             width={110}
             height={110}
-            className="object-contain"
+            // 기존 코드에서 rounded-2xl 클래스를 추가하여 모서리를 둥글게 다듬었습니다.
+            className="object-contain rounded-2xl"
             priority // 초기 화면에서 렌더링되므로 우선순위 부여
           />
         </div>
