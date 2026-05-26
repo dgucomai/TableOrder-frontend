@@ -1,10 +1,11 @@
 "use client";
 
 import React, { useEffect, useState, useRef } from 'react';
-import { Plus, Minus, X, ChevronRight, ReceiptText, Bell, BellRing } from 'lucide-react';
+import { Plus, Minus, X, ChevronRight, ChevronLeft, ReceiptText, Bell, BellRing } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import dynamic from 'next/dynamic';
+import { useRouter } from 'next/navigation';
 import { MenuItem, CartItem } from '@/components/types';
 
 // 🌟 지연 로딩(Lazy Loading)으로 모달 스플리팅
@@ -16,6 +17,8 @@ const MenuDetailModal = dynamic(() => import('@/components/MenuDetailModal'), { 
 const API_BASE_URL = "/api";
 
 export default function OrderPage() {
+  const router = useRouter();
+
   const [qrToken, setQrToken] = useState<string | null>(null);
   const [displayTableNum, setDisplayTableNum] = useState<string | null>(null);
   const [tableId, setTableId] = useState<number | null>(null); 
@@ -255,17 +258,30 @@ export default function OrderPage() {
         <>
           <div className="sticky top-0 z-30 flex flex-col bg-white">
             <header className="px-4 pt-3 pb-2 flex justify-between items-center">
-              <div className="min-w-0 flex-1 mr-2">
-                <h1 className="text-lg font-extrabold text-orange-600 tracking-tight whitespace-nowrap truncate">CAISINO ORDER</h1>
-                <div className="flex items-center gap-2 mt-0.5">
-                  <p className="text-xs font-bold text-gray-700 whitespace-nowrap shrink-0">
-                    {displayTableNum}번 테이블
-                  </p>
-                  <span className="text-[10px] bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded-md font-bold whitespace-nowrap shrink-0">
-                    보유 🪙 {currentTokenCount}개
-                  </span>
+              {/* 🌟 수정된 왼쪽 영역: 뒤로가기 버튼 + 타이틀 그룹 */}
+              <div className="flex items-center gap-1 min-w-0 flex-1">
+                <button 
+                  onClick={() => router.replace(`/?qt=${qrToken || ""}`)}
+                  className="p-1.5 -ml-1.5 text-gray-600 hover:bg-gray-100 rounded-full transition-colors shrink-0"
+                  aria-label="메인 페이지로 뒤로가기"
+                >
+                  <ChevronLeft className="w-6 h-6 shrink-0" />
+                </button>
+                
+                <div className="min-w-0 flex-1 mr-2 pl-1">
+                  <h1 className="text-lg font-extrabold text-orange-600 tracking-tight whitespace-nowrap truncate">CAISINO ORDER</h1>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <p className="text-xs font-bold text-gray-700 whitespace-nowrap shrink-0">
+                      {displayTableNum}번 테이블
+                    </p>
+                    <span className="text-[10px] bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded-md font-bold whitespace-nowrap shrink-0">
+                      보유 🪙 {currentTokenCount}개
+                    </span>
+                  </div>
                 </div>
               </div>
+
+              {/* 오른쪽 영역 (그대로 유지) */}
               <div className="flex items-center gap-1 shrink-0">
                 <button onClick={() => setIsCallModalOpen(true)} className="p-2 text-orange-600 hover:bg-orange-50 rounded-full transition-colors flex flex-col items-center justify-center whitespace-nowrap shrink-0">
                   <BellRing className="w-6 h-6 shrink-0" />
