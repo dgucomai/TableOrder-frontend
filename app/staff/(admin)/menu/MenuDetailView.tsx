@@ -138,7 +138,15 @@ export default function MenuDetailView({
   const servedOrders = data?.pages.flatMap((page) => page.servedItems.data) || [];
 
   return (
-    <div className="h-full min-h-[calc(100vh-4rem)] bg-[#020617] text-white overflow-y-auto">
+    <div className="relative h-full min-h-[calc(100vh-4rem)] bg-[#020617] text-white overflow-y-auto">
+      {(isTogglingSoldOut || (isFetching && status === "success")) && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm pointer-events-none">
+          <div className="flex flex-col items-center gap-4 bg-slate-800 border border-white/10 rounded-2xl p-8 shadow-2xl">
+            <div className="w-10 h-10 border-4 border-orange-500 border-t-transparent rounded-full animate-spin" />
+            <p className="text-white font-black text-sm tracking-widest uppercase">처리 중...</p>
+          </div>
+        </div>
+      )}
       <div className="sticky top-0 z-40 border-b border-slate-800 bg-[#020617]/95 backdrop-blur px-4 md:px-6 py-3">
         <div className="mx-auto max-w-6xl flex items-center justify-between gap-3">
           <button

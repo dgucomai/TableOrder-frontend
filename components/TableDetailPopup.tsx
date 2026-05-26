@@ -50,6 +50,7 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
   const [activeCalls, setActiveCalls] = useState<CallInfo[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [isApiLoading, setIsApiLoading] = useState(false);
 
   const formatTime = (isoString: string | null) => {
     if (!isoString) return "";
@@ -241,12 +242,13 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
     }
 
     try {
+      setIsApiLoading(true);
       const response = await staffFetch(`/api/staff/calls/${call.callId}/resolve`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
       });
 
-      const result = await response.json().catch(() => ({})); 
+      const result = await response.json().catch(() => ({}));
 
       if (response.ok || result.success) {
         setActiveCalls(prev => prev.filter(c => c.id !== call.id));
@@ -256,11 +258,14 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
     } catch (e) {
       console.error("호출 수락 에러:", e);
       alert("서버와 통신하는 중 통신 오류가 발생했습니다.");
+    } finally {
+      setIsApiLoading(false);
     }
   };
 
   const confirmGroupDeposit = async (orderId: number) => {
     try {
+      setIsApiLoading(true);
       const response = await staffFetch(`/api/staff/orders/${orderId}/approve`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -288,6 +293,8 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
     } catch (e) {
       console.error(e);
       alert("입금 승인 처리 중 네트워크 오류가 발생했습니다.");
+    } finally {
+      setIsApiLoading(false);
     }
   };
 
@@ -300,16 +307,17 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
     const nextStatusKr = currentItemStatus === "준비 중" ? "제공 완료" : "준비 중";
 
     try {
+      setIsApiLoading(true);
       const response = await staffFetch(`/api/staff/items/${orderItemId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: nextStatus }),
       });
-      
+
       if (response.ok) {
-        setOrders(prev => prev.map(order => 
-          order.orderItemId === orderItemId 
-            ? { ...order, itemStatus: nextStatusKr as Order["itemStatus"] } 
+        setOrders(prev => prev.map(order =>
+          order.orderItemId === orderItemId
+            ? { ...order, itemStatus: nextStatusKr as Order["itemStatus"] }
             : order
         ));
       } else {
@@ -317,6 +325,8 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
       }
     } catch (e) {
       alert("서버 통신 오류가 발생했습니다.");
+    } finally {
+      setIsApiLoading(false);
     }
   };
 
@@ -339,9 +349,10 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
   };
 
   const executeDeleteGroup = async () => {
-    if (orderIdToDelete === null) return; 
-    
+    if (orderIdToDelete === null) return;
+
     try {
+      setIsApiLoading(true);
       const response = await staffFetch(`/api/staff/orders/${orderIdToDelete}/reject`, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
@@ -366,13 +377,16 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
     } catch (e) {
       console.error(e);
       alert("주문 거절 실패: 서버와 통신 중 문제가 발생했습니다.");
+    } finally {
+      setIsApiLoading(false);
     }
   };
 
   const executeCancelGroup = async () => {
-    if (orderIdToCancel === null) return; 
-    
+    if (orderIdToCancel === null) return;
+
     try {
+      setIsApiLoading(true);
       const response = await staffFetch(`/api/staff/orders/${orderIdToCancel}/cancel`, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
@@ -397,6 +411,8 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
     } catch (e) {
       console.error(e);
       alert("주문 취소 실패: 서버와 통신 중 문제가 발생했습니다.");
+    } finally {
+      setIsApiLoading(false);
     }
   };
 
@@ -404,6 +420,7 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
     if (!tableId) return;
 
     try {
+      setIsApiLoading(true);
       const response = await staffFetch(`/api/staff/tables/${tableId}/clear`, {
         method: "PATCH",
       });
@@ -422,6 +439,8 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
       }
     } catch (error) {
       alert("서버와 통신하는 중 오류가 발생했습니다.");
+    } finally {
+      setIsApiLoading(false);
     }
   };
 
@@ -430,6 +449,7 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
     if (isNaN(deltaValue) || deltaValue === 0) return;
 
     try {
+      setIsApiLoading(true);
       const response = await staffFetch(`/api/tokens/${tableId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -446,6 +466,8 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
       }
     } catch (error) {
       alert("오류가 발생했습니다.");
+    } finally {
+      setIsApiLoading(false);
     }
   };
 
@@ -482,7 +504,15 @@ export default function TableDetailPopup({ tableId, onClose }: { tableId: number
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-md p-0 sm:p-4" onClick={onClose}>
-      <div className={`flex flex-col md:flex-row transition-all duration-500 w-full h-full sm:h-[90vh] max-w-[1400px] ${(isEditTokenOpen || isResetOpen || isDeleteOrderOpen || isCancelOrderOpen) ? "md:-translate-x-[5vw]" : ""}`} onClick={(e) => e.stopPropagation()}>
+      <div className={`relative flex flex-col md:flex-row transition-all duration-500 w-full h-full sm:h-[90vh] max-w-[1400px] ${(isEditTokenOpen || isResetOpen || isDeleteOrderOpen || isCancelOrderOpen) ? "md:-translate-x-[5vw]" : ""}`} onClick={(e) => e.stopPropagation()}>
+        {isApiLoading && (
+          <div className="absolute inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm rounded-[2rem] pointer-events-none">
+            <div className="flex flex-col items-center gap-4 bg-slate-800 border border-white/10 rounded-2xl p-8 shadow-2xl">
+              <div className="w-10 h-10 border-4 border-orange-500 border-t-transparent rounded-full animate-spin" />
+              <p className="text-white font-black text-sm tracking-widest uppercase">처리 중...</p>
+            </div>
+          </div>
+        )}
         
         <motion.div className="relative flex-1 bg-[#1e293b] sm:rounded-[2rem] shadow-2xl border border-white/10 flex flex-col overflow-hidden z-10">
           {/* =======================================================
