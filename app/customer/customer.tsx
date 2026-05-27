@@ -420,9 +420,9 @@ export default function OrderPage() {
           <div className="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mb-8 shrink-0">
             <Bell className="text-green-600 animate-bounce shrink-0" size={48} />
           </div>
-          <h2 className="text-xl font-black text-gray-900 mb-4 text-center whitespace-nowrap truncate max-w-full">주문 접수(입금 확인) 요청 완료!</h2>
+          <h2 className="text-xl font-black text-gray-900 mb-4 text-center whitespace-nowrap truncate max-w-full">주문 접수 완료!</h2>
           <p className="text-gray-500 text-center mb-12 text-sm whitespace-nowrap truncate max-w-full">
-            직원이 입금을 확인하면 자동으로 접수됩니다.
+            곧 직원이 입금을 확인할 예정입니다. 입금 내역 화면을 준비해주세요.
           </p>
           <button 
             onClick={() => setStep('MENU')}
