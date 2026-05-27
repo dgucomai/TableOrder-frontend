@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { ArrowLeft, Clock, ImageOff, RefreshCw, CheckCircle2, Loader2 } from "lucide-react";
 import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 import { useInView } from "react-intersection-observer";
@@ -60,6 +60,7 @@ export default function MenuDetailView({
   onBackClick,
   onToggleSoldOut,
 }: MenuDetailViewProps) {
+  const [isApiLoading, setIsApiLoading] = useState(false);
   const queryClient = useQueryClient();
   const { ref, inView } = useInView({
     threshold: 0.5,
@@ -97,20 +98,22 @@ export default function MenuDetailView({
     const nextStatus = currentItemStatus === "PREPARING" ? "SERVED" : "PREPARING";
 
     try {
+      setIsApiLoading(true);
       const response = await staffFetch(`/api/staff/items/${orderItemId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: nextStatus }),
       });
-      
+
       if (response.ok) {
-        // 성공 시 해당 메뉴의 쿼리를 무효화하여 즉시 최신 상태로 재호출(Refresh)
         queryClient.invalidateQueries({ queryKey: ["menuDetail", menu.menuId] });
       } else {
         alert("상태 변경에 실패했습니다.");
       }
     } catch (e) {
       alert("서버 통신 오류가 발생했습니다.");
+    } finally {
+      setIsApiLoading(false);
     }
   };
 
@@ -139,7 +142,7 @@ export default function MenuDetailView({
 
   return (
     <div className="relative h-full min-h-[calc(100vh-4rem)] bg-[#020617] text-white overflow-y-auto">
-      {(isTogglingSoldOut || (isFetching && status === "success")) && (
+      {(isApiLoading || isTogglingSoldOut) && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm pointer-events-none">
           <div className="flex flex-col items-center gap-4 bg-slate-800 border border-white/10 rounded-2xl p-8 shadow-2xl">
             <div className="w-10 h-10 border-4 border-orange-500 border-t-transparent rounded-full animate-spin" />
